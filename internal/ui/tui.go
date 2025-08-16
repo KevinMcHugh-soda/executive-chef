@@ -48,13 +48,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var vpCmd tea.Cmd
 	m.vp, vpCmd = m.vp.Update(msg)
 
-	if newMode, cmd := m.mode.Update(m, msg); newMode != nil {
+	newMode, modeCmd := m.mode.Update(m, msg)
+	if newMode != nil {
 		m.mode = newMode
 		initCmd := m.mode.Init(m)
-		return m, tea.Batch(cmd, initCmd, vpCmd)
+		return m, tea.Batch(modeCmd, initCmd, vpCmd)
 	}
 
-	return m, tea.Batch(vpCmd)
+	return m, tea.Batch(vpCmd, modeCmd)
 }
 
 func (m *model) View() string {
