@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -23,13 +24,13 @@ type model struct {
 	actions chan<- game.Action
 	mode    uiMode
 	events  []string
+	vp      viewport.Model
 }
-
-const maxEvents = 5
 
 func initialModel(actions chan<- game.Action) *model {
 	m := &model{actions: actions}
 	m.mode = &draftMode{}
+	m.vp = viewport.New(20, 7)
 	return m
 }
 
@@ -40,29 +41,26 @@ func (m *model) Init() tea.Cmd {
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if e, ok := msg.(game.Event); ok {
 		m.events = append(m.events, eventString(e))
-		if len(m.events) > maxEvents {
-			m.events = m.events[len(m.events)-maxEvents:]
-		}
+		m.vp.SetContent(strings.Join(m.events, "\n"))
+		m.vp.GotoBottom()
 	}
+
+	var vpCmd tea.Cmd
+	m.vp, vpCmd = m.vp.Update(msg)
 
 	if newMode, cmd := m.mode.Update(m, msg); newMode != nil {
 		m.mode = newMode
 		initCmd := m.mode.Init(m)
-		return m, tea.Batch(cmd, initCmd)
-	} else {
-		return m, cmd
+		return m, tea.Batch(cmd, initCmd, vpCmd)
 	}
+
+	return m, tea.Batch(vpCmd)
 }
 
 func (m *model) View() string {
 	main := m.mode.View(m)
 
-	var b strings.Builder
-	b.WriteString(titleStyle.Render("Events") + "\n")
-	for _, e := range m.events {
-		b.WriteString(e + "\n")
-	}
-	logView := paneStyle.Render(b.String())
+	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
 }
