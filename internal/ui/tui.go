@@ -34,9 +34,9 @@ type model struct {
 	phase       game.Phase
 	dishes      []dish.Dish
 	ingredients []ingredient.Ingredient
-	message string
-	width   int
-	money   int
+	message     string
+	width       int
+	money       int
 }
 
 func initialModel(actions chan<- game.Action) *model {
@@ -95,14 +95,14 @@ func (m *model) View() string {
 	main := m.mode.View(m)
 
 	var infoBuilder strings.Builder
-        infoBuilder.WriteString(titleStyle.Render("Game Info") + "\n")
-        infoBuilder.WriteString(
-                fmt.Sprintf(
-                        "Turn: %d\nPhase: %s\nMoney: $%d\n",
-                        m.turn, m.phase, m.money,
-                ),
-        )
-        infoBuilder.WriteString("Dishes:\n")
+	infoBuilder.WriteString(titleStyle.Render("Game Info") + "\n")
+	infoBuilder.WriteString(
+		fmt.Sprintf(
+			"Turn: %d\nPhase: %s\nMoney: $%d\n",
+			m.turn, m.phase, m.money,
+		),
+	)
+	infoBuilder.WriteString("Dishes:\n")
 	if len(m.dishes) == 0 {
 		infoBuilder.WriteString("  (none)\n")
 	} else {
@@ -415,9 +415,9 @@ func (s *serviceMode) View(m *model) string {
 		}
 		b.WriteString(fmt.Sprintf("%s: %s -> ", s.current.Customer.Name, strings.Join(craving, ", ")))
 		if s.current.Dish != nil {
-			b.WriteString(s.current.Dish.Name)
+			b.WriteString(servedStyle.Render(s.current.Dish.Name))
 		} else {
-			b.WriteString("no dish")
+			b.WriteString(missingStyle.Render("no dish"))
 		}
 		if s.current.Payment > 0 {
 			b.WriteString(fmt.Sprintf(" ($%d)", s.current.Payment))
@@ -439,6 +439,7 @@ var (
 	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
 	missingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
+	servedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00"))
 	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
 	messageStyle  = lipgloss.NewStyle().Padding(0, 1)
 	logStyle      = paneStyle.Copy().Width(logWidth)
