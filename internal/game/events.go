@@ -62,6 +62,8 @@ func (e DishCreatedEvent) EventType() string { return "dish_created" }
 type ServiceResultEvent struct {
 	Customer customer.Customer
 	Dish     *dish.Dish
+	Payment  int
+	Money    int
 }
 
 func (e ServiceResultEvent) EventType() string { return "service_result" }

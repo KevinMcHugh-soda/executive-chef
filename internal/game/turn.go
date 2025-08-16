@@ -89,9 +89,11 @@ func (t *Turn) ServicePhase() {
 	for i, c := range customers {
 		bestIdx := -1
 		bestScore := 0
+		bestCraving := -1
 		for i, d := range available {
 			score := 0
-			for _, cr := range c.Cravings {
+			cravingIdx := -1
+			for j, cr := range c.Cravings {
 				count := 0
 				for _, ing := range cr.Ingredients {
 					for _, ding := range d.Ingredients {
@@ -103,20 +105,32 @@ func (t *Turn) ServicePhase() {
 				}
 				if count > score {
 					score = count
+					cravingIdx = j
 				}
 			}
 			if score > bestScore {
 				bestScore = score
 				bestIdx = i
+				bestCraving = cravingIdx
 			}
 		}
 		var chosen *dish.Dish
+		payment := 0
 		if bestIdx >= 0 {
 			d := available[bestIdx]
 			chosen = &d
 			available = append(available[:bestIdx], available[bestIdx+1:]...)
+			switch bestCraving {
+			case 0:
+				payment = 5
+			case 1:
+				payment = 3
+			case 2:
+				payment = 1
+			}
+			t.Player.AddMoney(payment)
 		}
-		t.Events <- ServiceResultEvent{Customer: c, Dish: chosen}
+		t.Events <- ServiceResultEvent{Customer: c, Dish: chosen, Payment: payment, Money: t.Player.Money}
 		if i < len(customers)-1 {
 			for {
 				if _, ok := (<-t.Actions).(ContinueAction); ok {
