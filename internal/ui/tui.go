@@ -270,10 +270,12 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 				d.selecting = true
 				d.name.Blur()
 			}
-		case "f":
-			m.message = ""
-			m.actions <- game.FinishDesignAction{}
-			return nil, nil
+		case "f", "F":
+			if d.selecting {
+				m.message = ""
+				m.actions <- game.FinishDesignAction{}
+				return nil, nil
+			}
 		}
 	}
 	return nil, cmd
