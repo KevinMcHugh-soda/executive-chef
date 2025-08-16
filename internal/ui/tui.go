@@ -167,6 +167,8 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 		d.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
+	case game.ServiceResultEvent:
+		return &serviceMode{results: []game.ServiceResultEvent{msg}}, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -203,7 +205,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 			}
 		case "f":
 			m.actions <- game.FinishDesignAction{}
-			return nil, tea.Quit
+			return nil, nil
 		}
 	}
 	return nil, cmd
@@ -238,6 +240,53 @@ func (d *designMode) View(m *model) string {
 		b.WriteString(d.message + "\n")
 	}
 	b.WriteString("\nspace: select • enter: create dish • f: finish\n")
+	return paneStyle.Render(b.String())
+}
+
+// ---- Service Mode ----
+type serviceMode struct {
+	results  []game.ServiceResultEvent
+	finished bool
+}
+
+func (s *serviceMode) Init(m *model) tea.Cmd { return nil }
+
+func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
+	switch msg := msg.(type) {
+	case game.ServiceResultEvent:
+		s.results = append(s.results, msg)
+	case game.ServiceEndEvent:
+		s.finished = true
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return nil, tea.Quit
+		}
+	}
+	return nil, nil
+}
+
+func (s *serviceMode) View(m *model) string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("Service Results") + "\n")
+	for _, r := range s.results {
+		var craving []string
+		if len(r.Customer.Cravings) > 0 {
+			for _, ing := range r.Customer.Cravings[0].Ingredients {
+				craving = append(craving, ing.Name)
+			}
+		}
+		b.WriteString(fmt.Sprintf("%s -> ", strings.Join(craving, ", ")))
+		if r.Dish != nil {
+			b.WriteString(r.Dish.Name)
+		} else {
+			b.WriteString("no dish")
+		}
+		b.WriteString("\n")
+	}
+	if s.finished {
+		b.WriteString("\nPress q to quit\n")
+	}
 	return paneStyle.Render(b.String())
 }
 

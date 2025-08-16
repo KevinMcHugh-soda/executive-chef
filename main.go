@@ -28,6 +28,7 @@ func main() {
 	go func() {
 		t.DraftPhase()
 		t.DesignPhase()
+		t.ServicePhase()
 		close(events)
 	}()
 

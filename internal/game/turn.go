@@ -1,6 +1,7 @@
 package game
 
 import (
+	"executive-chef/internal/customer"
 	"executive-chef/internal/deck"
 	"executive-chef/internal/dish"
 	"executive-chef/internal/ingredient"
@@ -69,4 +70,43 @@ func (t *Turn) DesignPhase() {
 			return
 		}
 	}
+}
+
+// ServicePhase presents dishes to customers who choose based on their cravings.
+func (t *Turn) ServicePhase() {
+	customers := customer.RandomCustomers(t.Player.Drafted, 3)
+	available := append([]dish.Dish(nil), t.Player.Dishes...)
+	for _, c := range customers {
+		bestIdx := -1
+		bestScore := 0
+		for i, d := range available {
+			score := 0
+			for _, cr := range c.Cravings {
+				count := 0
+				for _, ing := range cr.Ingredients {
+					for _, ding := range d.Ingredients {
+						if ing == ding {
+							count++
+							break
+						}
+					}
+				}
+				if count > score {
+					score = count
+				}
+			}
+			if score > bestScore {
+				bestScore = score
+				bestIdx = i
+			}
+		}
+		var chosen *dish.Dish
+		if bestIdx >= 0 {
+			d := available[bestIdx]
+			chosen = &d
+			available = append(available[:bestIdx], available[bestIdx+1:]...)
+		}
+		t.Events <- ServiceResultEvent{Customer: c, Dish: chosen}
+	}
+	t.Events <- ServiceEndEvent{}
 }
