@@ -157,67 +157,93 @@ func (d *draftMode) Status(m *model) string {
 
 // ---- Design Mode ----
 type designMode struct {
-	drafted  []ingredient.Ingredient
-	cursor   int
-	selected map[int]bool
-	name     textinput.Model
-	message  string
-	dishes   []string
+	drafted   []ingredient.Ingredient
+	cursor    int
+	selected  map[int]bool
+	name      textinput.Model
+	message   string
+	dishes    []string
+	selecting bool
+	confirm   bool
 }
 
 func (d *designMode) Init(m *model) tea.Cmd {
 	d.selected = make(map[int]bool)
 	d.name = textinput.New()
 	d.name.Placeholder = "Dish name"
-	d.name.Focus()
+	d.name.Blur()
 	d.dishes = []string{}
+	d.selecting = true
+	d.confirm = false
 	return nil
 }
 
 func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	var cmd tea.Cmd
-	d.name, cmd = d.name.Update(msg)
+	if !d.selecting {
+		d.name, cmd = d.name.Update(msg)
+	}
 	switch msg := msg.(type) {
 	case game.DishCreatedEvent:
 		d.dishes = append(d.dishes, msg.Dish.Name)
 		d.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
+		d.confirm = false
 	case game.ServiceResultEvent:
 		return &serviceMode{results: []game.ServiceResultEvent{msg}}, nil
 	case tea.KeyMsg:
+		if msg.String() != "enter" {
+			d.confirm = false
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.actions <- game.FinishDesignAction{}
 			return nil, tea.Quit
 		case "up", "k":
-			if d.cursor > 0 {
+			if d.selecting && d.cursor > 0 {
 				d.cursor--
 			}
 		case "down", "j":
-			if d.cursor < len(d.drafted)-1 {
+			if d.selecting && d.cursor < len(d.drafted)-1 {
 				d.cursor++
 			}
-		case " ":
-			if d.selected[d.cursor] {
-				delete(d.selected, d.cursor)
-			} else {
-				d.selected[d.cursor] = true
-			}
 		case "enter":
-			name := strings.TrimSpace(d.name.Value())
-			if len(d.dishes) >= 2 {
-				d.message = "Maximum of 2 dishes reached"
-				break
-			}
-			if name != "" && len(d.selected) > 0 {
-				var indices []int
-				for i := range d.drafted {
-					if d.selected[i] {
-						indices = append(indices, i)
-					}
+			if d.selecting {
+				if d.selected[d.cursor] {
+					delete(d.selected, d.cursor)
+				} else {
+					d.selected[d.cursor] = true
 				}
-				m.actions <- game.CreateDishAction{Name: name, Indices: indices}
+			} else {
+				if !d.confirm {
+					d.confirm = true
+				} else {
+					name := strings.TrimSpace(d.name.Value())
+					if len(d.dishes) >= 2 {
+						d.message = "Maximum of 2 dishes reached"
+						break
+					}
+					if name != "" && len(d.selected) > 0 {
+						var indices []int
+						for i := range d.drafted {
+							if d.selected[i] {
+								indices = append(indices, i)
+							}
+						}
+						m.actions <- game.CreateDishAction{Name: name, Indices: indices}
+					}
+					d.confirm = false
+				}
+			}
+		case "tab":
+			d.confirm = false
+			if d.selecting {
+				d.selecting = false
+				d.name.Focus()
+			} else {
+				d.selecting = true
+				d.name.Blur()
 			}
 		case "f":
 			m.actions <- game.FinishDesignAction{}
@@ -259,7 +285,7 @@ func (d *designMode) View(m *model) string {
 }
 
 func (d *designMode) Status(m *model) string {
-	return "up/down: move • space: select • enter: create dish • f: finish • q: quit"
+	return "up/down: move • enter: select • tab: name • enter x2: create dish • f: finish • q: quit"
 }
 
 // ---- Service Mode ----
