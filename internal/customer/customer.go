@@ -1,10 +1,12 @@
 package customer
 
 import (
-	"math/rand"
-	"time"
+        "math/rand"
+        "time"
 
-	"executive-chef/internal/ingredient"
+        "github.com/brianvoe/gofakeit/v7"
+
+        "executive-chef/internal/ingredient"
 )
 
 // Craving represents a combination of ingredients a customer wants.
@@ -12,9 +14,10 @@ type Craving struct {
 	Ingredients []ingredient.Ingredient
 }
 
-// Customer represents a single customer with ordered cravings.
+// Customer represents a single customer with ordered cravings and a name.
 type Customer struct {
-	Cravings []Craving
+        Name     string
+        Cravings []Craving
 }
 
 // RandomCraving returns a Craving made of random ingredients.
@@ -37,11 +40,11 @@ func RandomCustomer(ingredients []ingredient.Ingredient, numCravings int) Custom
 	if numCravings <= 0 {
 		numCravings = 1
 	}
-	cravings := make([]Craving, numCravings)
-	for i := 0; i < numCravings; i++ {
-		cravings[i] = RandomCraving(ingredients)
-	}
-	return Customer{Cravings: cravings}
+        cravings := make([]Craving, numCravings)
+        for i := 0; i < numCravings; i++ {
+                cravings[i] = RandomCraving(ingredients)
+        }
+        return Customer{Name: gofakeit.Name(), Cravings: cravings}
 }
 
 // RandomCustomers generates the specified number of customers.
@@ -55,5 +58,6 @@ func RandomCustomers(ingredients []ingredient.Ingredient, count int) []Customer 
 }
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
+        rand.Seed(time.Now().UnixNano())
+        gofakeit.Seed(time.Now().UnixNano())
 }
