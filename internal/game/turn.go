@@ -4,25 +4,20 @@ import (
 	"sort"
 
 	"executive-chef/internal/customer"
-	"executive-chef/internal/deck"
 	"executive-chef/internal/dish"
 	"executive-chef/internal/ingredient"
-	"executive-chef/internal/player"
 )
 
 // Turn represents a single turn in the game.
 type Turn struct {
-	Number  int
-	Deck    *deck.Deck
-	Player  *player.Player
-	Events  chan<- Event
-	Actions <-chan Action
+	Number int
+	Game   *Game
 }
 
 // DraftPhase performs the drafting phase of a turn. Ten cards are revealed and
 // the player may draft three of them in the first turn and five thereafter.
 func (t *Turn) DraftPhase() {
-	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
+	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
 	reveal := t.Deck.Draw(10)
 	roleOrder := map[ingredient.Role]int{
 		ingredient.Protein:   0,
@@ -38,23 +33,20 @@ func (t *Turn) DraftPhase() {
 		return reveal[i].Name < reveal[j].Name
 	})
 	remaining := 3
-	if t.Number > 1 {
-		remaining = 5
-	}
-	t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
+	t.Game.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
 	for remaining > 0 && len(reveal) > 0 {
-		act := <-t.Actions
+		act := <-t.Game.Actions
 		sel, ok := act.(DraftSelectionAction)
 		if !ok || sel.Index < 0 || sel.Index >= len(reveal) {
 			continue
 		}
 		chosen := reveal[sel.Index]
-		t.Player.Add(chosen)
-		t.Events <- IngredientDraftedEvent{Ingredient: chosen}
+		t.Game.Player.Add(chosen)
+		t.Game.Events <- IngredientDraftedEvent{Ingredient: chosen}
 		reveal = append(reveal[:sel.Index], reveal[sel.Index+1:]...)
 		remaining--
 		if remaining > 0 && len(reveal) > 0 {
-			t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
+			t.Game.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
 		}
 	}
 }
@@ -63,40 +55,41 @@ func (t *Turn) DraftPhase() {
 // The player can create up to two dishes this turn and may have up to ten dishes
 // overall. The phase ends when a FinishDesignAction is received.
 func (t *Turn) DesignPhase() {
-	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDesign}
-	t.Events <- DesignOptionsEvent{Drafted: t.Player.Drafted}
+	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDesign}
+	t.Game.Events <- DesignOptionsEvent{Drafted: t.Game.Player.Drafted}
 	created := 0
+
 	for {
-		act := <-t.Actions
+		act := <-t.Game.Actions
 		switch a := act.(type) {
 		case CreateDishAction:
-			if a.Name == "" || created >= 2 || len(t.Player.Dishes) >= 10 {
+			if a.Name == "" || created >= 2 || len(t.Game.Player.Dishes) >= 10 {
 				continue
 			}
 			used := make(map[int]bool)
 			var dishIngs []ingredient.Ingredient
 			valid := true
 			for _, idx := range a.Indices {
-				if idx < 0 || idx >= len(t.Player.Drafted) || used[idx] {
+				if idx < 0 || idx >= len(t.Game.Player.Drafted) || used[idx] {
 					valid = false
 					break
 				}
 				used[idx] = true
-				dishIngs = append(dishIngs, t.Player.Drafted[idx])
+				dishIngs = append(dishIngs, t.Game.Player.Drafted[idx])
 			}
 			if !valid || len(dishIngs) == 0 {
 				continue
 			}
 			d := dish.Dish{Name: a.Name, Ingredients: dishIngs}
-			t.Player.AddDish(d)
+			t.Game.Player.AddDish(d)
 			created++
-			t.Events <- DishCreatedEvent{Dish: d}
+			t.Game.Events <- DishCreatedEvent{Dish: d}
 		case DeleteDishAction:
 			if created > 0 {
-				d, ok := t.Player.RemoveLastDish()
+				d, ok := t.Game.Player.RemoveLastDish()
 				if ok {
 					created--
-					t.Events <- DishDeletedEvent{Dish: d}
+					t.Game.Events <- DishDeletedEvent{Dish: d}
 				}
 			}
 		case FinishDesignAction:
@@ -107,11 +100,11 @@ func (t *Turn) DesignPhase() {
 
 // ServicePhase presents dishes to customers who choose based on their cravings.
 func (t *Turn) ServicePhase() {
-	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
-	customers := customer.RandomCustomers(t.Player.Drafted, 3)
+	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
+	customers := customer.RandomCustomers(t.Game.AllIngredients, 3)
 	var available []dish.Dish
-	for _, d := range t.Player.Dishes {
-		if hasIngredients(t.Player.Drafted, d.Ingredients) {
+	for _, d := range t.Game.Player.Dishes {
+		if hasIngredients(t.Game.Player.Drafted, d.Ingredients) {
 			available = append(available, d)
 		}
 	}
@@ -156,20 +149,20 @@ func (t *Turn) ServicePhase() {
 			case 2:
 				payment = 1
 			}
-			t.Player.AddMoney(payment)
+			t.Game.Player.AddMoney(payment)
 		}
-		t.Events <- ServiceResultEvent{Customer: c, Dish: chosen, Payment: payment, Money: t.Player.Money}
+		t.Game.Events <- ServiceResultEvent{Customer: c, Dish: chosen, Payment: payment, Money: t.Game.Player.Money}
 		if i < len(customers)-1 {
 			for {
-				if _, ok := (<-t.Actions).(ContinueAction); ok {
+				if _, ok := (<-t.Game.Actions).(ContinueAction); ok {
 					break
 				}
 			}
 		}
 	}
-	t.Events <- ServiceEndEvent{}
+	t.Game.Events <- ServiceEndEvent{}
 	for {
-		if _, ok := (<-t.Actions).(ContinueAction); ok {
+		if _, ok := (<-t.Game.Actions).(ContinueAction); ok {
 			break
 		}
 	}
