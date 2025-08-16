@@ -188,7 +188,8 @@ func (d *designMode) View(m *model) string {
 
 // ---- Service Mode ----
 type serviceMode struct {
-	results []game.ServiceResultEvent
+	results  []game.ServiceResultEvent
+	finished bool
 }
 
 func (s *serviceMode) Init(m *model) tea.Cmd { return nil }
@@ -198,7 +199,7 @@ func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	case game.ServiceResultEvent:
 		s.results = append(s.results, msg)
 	case game.ServiceEndEvent:
-		return nil, tea.Quit
+		s.finished = true
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -225,6 +226,9 @@ func (s *serviceMode) View(m *model) string {
 			b.WriteString("no dish")
 		}
 		b.WriteString("\n")
+	}
+	if s.finished {
+		b.WriteString("\nPress q to quit\n")
 	}
 	return paneStyle.Render(b.String())
 }
