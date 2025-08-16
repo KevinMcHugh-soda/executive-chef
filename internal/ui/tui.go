@@ -313,16 +313,28 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					}
 					if len(d.selected) == 0 {
 						m.message = "select at least one ingredient to create a dish!"
-					} else if name != "" {
+					} else {
 						var indices []int
 						for i := range d.drafted {
 							if d.selected[i] {
 								indices = append(indices, i)
 							}
 						}
+						if name == "" {
+							var firstTwo []string
+							for _, idx := range indices {
+								firstTwo = append(firstTwo, d.drafted[idx].Name)
+								if len(firstTwo) == 2 {
+									break
+								}
+							}
+							if len(firstTwo) >= 2 {
+								name = firstTwo[0] + " and " + firstTwo[1]
+							} else if len(firstTwo) == 1 {
+								name = firstTwo[0]
+							}
+						}
 						m.actions <- game.CreateDishAction{Name: name, Indices: indices}
-						m.message = ""
-					} else {
 						m.message = ""
 					}
 					d.confirm = false
