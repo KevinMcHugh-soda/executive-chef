@@ -111,11 +111,15 @@ func (m *model) View() string {
 		infoBuilder.WriteString("  (none)\n")
 	} else {
 		for _, d := range m.dishes {
-			name := d.Name
-			if !m.hasIngredients(d) {
-				name = missingStyle.Render(name)
+			have, total := m.ingredientCount(d)
+			line := fmt.Sprintf("- %s", d.Name)
+			if have < total {
+				line = fmt.Sprintf("%s (%d/%d)", line, have, total)
+				line = missingStyle.Render(line)
+			} else {
+				line = servedStyle.Render(line)
 			}
-			infoBuilder.WriteString("- " + name + "\n")
+			infoBuilder.WriteString(line + "\n")
 		}
 	}
 	info := paneStyle.Render(infoBuilder.String())
@@ -133,20 +137,22 @@ func (m *model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, info, content, status, message)
 }
 
-func (m *model) hasIngredients(d dish.Dish) bool {
+func (m *model) ingredientCount(d dish.Dish) (have, total int) {
+	total = len(d.Ingredients)
 	for _, need := range d.Ingredients {
-		found := false
-		for _, have := range m.ingredients {
-			if have == need {
-				found = true
+		for _, ing := range m.ingredients {
+			if ing == need {
+				have++
 				break
 			}
 		}
-		if !found {
-			return false
-		}
 	}
-	return true
+	return have, total
+}
+
+func (m *model) hasIngredients(d dish.Dish) bool {
+	have, total := m.ingredientCount(d)
+	return have == total
 }
 
 func eventString(e game.Event) string {
