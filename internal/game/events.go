@@ -88,3 +88,8 @@ func (a CreateDishAction) ActionType() string { return "create_dish" }
 type FinishDesignAction struct{}
 
 func (a FinishDesignAction) ActionType() string { return "finish_design" }
+
+// ContinueAction advances the game during service or to the next turn.
+type ContinueAction struct{}
+
+func (a ContinueAction) ActionType() string { return "continue" }
