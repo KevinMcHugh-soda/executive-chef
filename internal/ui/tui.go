@@ -18,6 +18,8 @@ type uiMode interface {
 	Init(*model) tea.Cmd
 	Update(*model, tea.Msg) (uiMode, tea.Cmd)
 	View(*model) string
+	// Status returns a short help prompt for the status bar.
+	Status(*model) string
 }
 
 type model struct {
@@ -70,7 +72,8 @@ func (m *model) View() string {
 	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
-	return lipgloss.JoinVertical(lipgloss.Left, info, content)
+	status := statusStyle.Render(m.mode.Status(m))
+	return lipgloss.JoinVertical(lipgloss.Left, info, content, status)
 }
 
 func eventString(e game.Event) string {
@@ -145,6 +148,10 @@ func (d *draftMode) View(m *model) string {
 		b.WriteString(line + "\n")
 	}
 	return paneStyle.Render(b.String())
+}
+
+func (d *draftMode) Status(m *model) string {
+	return "up/down: move • enter/space: draft • q: quit"
 }
 
 // ---- Design Mode ----
@@ -247,8 +254,11 @@ func (d *designMode) View(m *model) string {
 	if d.message != "" {
 		b.WriteString(d.message + "\n")
 	}
-	b.WriteString("\nspace: select • enter: create dish • f: finish\n")
 	return paneStyle.Render(b.String())
+}
+
+func (d *designMode) Status(m *model) string {
+	return "up/down: move • space: select • enter: create dish • f: finish • q: quit"
 }
 
 // ---- Service Mode ----
@@ -292,16 +302,21 @@ func (s *serviceMode) View(m *model) string {
 		}
 		b.WriteString("\n")
 	}
-	if s.finished {
-		b.WriteString("\nPress q to quit\n")
-	}
 	return paneStyle.Render(b.String())
+}
+
+func (s *serviceMode) Status(m *model) string {
+	if s.finished {
+		return "q: quit"
+	}
+	return ""
 }
 
 var (
 	titleStyle    = lipgloss.NewStyle().Bold(true)
 	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
+	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
 )
 
 // Run renders game events and sends player actions back to the game.
