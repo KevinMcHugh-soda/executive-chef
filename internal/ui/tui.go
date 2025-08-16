@@ -1,15 +1,16 @@
 package ui
 
 import (
-	"fmt"
-	"strings"
+        "fmt"
+        "strconv"
+        "strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+        "github.com/charmbracelet/bubbles/textinput"
+        tea "github.com/charmbracelet/bubbletea"
+        "github.com/charmbracelet/lipgloss"
 
-	"executive-chef/internal/game"
-	"executive-chef/internal/ingredient"
+        "executive-chef/internal/game"
+        "executive-chef/internal/ingredient"
 )
 
 // uiMode represents a UI mode for a game phase.
@@ -141,104 +142,109 @@ func (d *draftMode) View(m *model) string {
 
 // ---- Design Mode ----
 type designMode struct {
-	drafted  []ingredient.Ingredient
-	cursor   int
-	selected map[int]bool
-	name     textinput.Model
-	message  string
-	dishes   []string
+        drafted  []ingredient.Ingredient
+        selected map[int]bool
+        name     textinput.Model
+        message  string
+        dishes   []string
+        naming   bool
 }
 
 func (d *designMode) Init(m *model) tea.Cmd {
-	d.selected = make(map[int]bool)
-	d.name = textinput.New()
-	d.name.Placeholder = "Dish name"
-	d.name.Focus()
-	d.dishes = []string{}
-	return nil
+        d.selected = make(map[int]bool)
+        d.name = textinput.New()
+        d.name.Placeholder = "Dish name"
+        d.name.Blur()
+        d.dishes = []string{}
+        d.naming = false
+        return nil
 }
 
 func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
-	var cmd tea.Cmd
-	d.name, cmd = d.name.Update(msg)
-	switch msg := msg.(type) {
-	case game.DishCreatedEvent:
-		d.dishes = append(d.dishes, msg.Dish.Name)
-		d.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
-		d.name.SetValue("")
-		d.selected = make(map[int]bool)
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			m.actions <- game.FinishDesignAction{}
-			return nil, tea.Quit
-		case "up", "k":
-			if d.cursor > 0 {
-				d.cursor--
-			}
-		case "down", "j":
-			if d.cursor < len(d.drafted)-1 {
-				d.cursor++
-			}
-		case " ":
-			if d.selected[d.cursor] {
-				delete(d.selected, d.cursor)
-			} else {
-				d.selected[d.cursor] = true
-			}
-		case "enter":
-			name := strings.TrimSpace(d.name.Value())
-			if len(d.dishes) >= 2 {
-				d.message = "Maximum of 2 dishes reached"
-				break
-			}
-			if name != "" && len(d.selected) > 0 {
-				var indices []int
-				for i := range d.drafted {
-					if d.selected[i] {
-						indices = append(indices, i)
-					}
-				}
-				m.actions <- game.CreateDishAction{Name: name, Indices: indices}
-			}
-		case "f":
-			m.actions <- game.FinishDesignAction{}
-			return nil, tea.Quit
-		}
-	}
-	return nil, cmd
+        var cmd tea.Cmd
+        if d.naming {
+                d.name, cmd = d.name.Update(msg)
+        }
+        switch msg := msg.(type) {
+        case game.DishCreatedEvent:
+                d.dishes = append(d.dishes, msg.Dish.Name)
+                d.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
+                d.name.SetValue("")
+                d.selected = make(map[int]bool)
+                d.naming = false
+                d.name.Blur()
+        case tea.KeyMsg:
+                switch msg.String() {
+                case "ctrl+c", "q":
+                        m.actions <- game.FinishDesignAction{}
+                        return nil, tea.Quit
+                case "enter":
+                        if !d.naming {
+                                d.naming = true
+                                d.name.Focus()
+                        } else {
+                                name := strings.TrimSpace(d.name.Value())
+                                if len(d.dishes) >= 2 {
+                                        d.message = "Maximum of 2 dishes reached"
+                                        break
+                                }
+                                if name != "" && len(d.selected) > 0 {
+                                        var indices []int
+                                        for i := range d.drafted {
+                                                if d.selected[i] {
+                                                        indices = append(indices, i)
+                                                }
+                                        }
+                                        m.actions <- game.CreateDishAction{Name: name, Indices: indices}
+                                }
+                        }
+                case "f":
+                        m.actions <- game.FinishDesignAction{}
+                        return nil, tea.Quit
+                default:
+                        if !d.naming {
+                                if i, err := strconv.Atoi(msg.String()); err == nil {
+                                        idx := i - 1
+                                        if idx >= 0 && idx < len(d.drafted) {
+                                                if d.selected[idx] {
+                                                        delete(d.selected, idx)
+                                                } else {
+                                                        d.selected[idx] = true
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+        return nil, cmd
 }
 
 func (d *designMode) View(m *model) string {
-	var b strings.Builder
-	b.WriteString(titleStyle.Render("Design Dishes") + "\n")
-	for i, ing := range d.drafted {
-		cursor := " "
-		if d.cursor == i {
-			cursor = ">"
-		}
-		mark := " "
-		if d.selected[i] {
-			mark = "*"
-		}
-		line := fmt.Sprintf("%s%s %s (%s)", cursor, mark, ing.Name, ing.Role)
-		if d.cursor == i || d.selected[i] {
-			line = selectedStyle.Render(line)
-		}
-		b.WriteString(line + "\n")
-	}
-	if len(d.dishes) > 0 {
-		b.WriteString("\nDishes:\n")
-		for _, name := range d.dishes {
-			b.WriteString("- " + name + "\n")
-		}
-	}
-	b.WriteString("\n" + d.name.View() + "\n")
-	if d.message != "" {
-		b.WriteString(d.message + "\n")
-	}
-	b.WriteString("\nspace: select • enter: create dish • f: finish\n")
-	return paneStyle.Render(b.String())
+        var b strings.Builder
+        b.WriteString(titleStyle.Render("Design Dishes") + "\n")
+        for i, ing := range d.drafted {
+                mark := " "
+                if d.selected[i] {
+                        mark = "*"
+                }
+                line := fmt.Sprintf("%d%s %s (%s)", i+1, mark, ing.Name, ing.Role)
+                if d.selected[i] {
+                        line = selectedStyle.Render(line)
+                }
+                b.WriteString(line + "\n")
+        }
+        if len(d.dishes) > 0 {
+                b.WriteString("\nDishes:\n")
+                for _, name := range d.dishes {
+                        b.WriteString("- " + name + "\n")
+                }
+        }
+        b.WriteString("\n" + d.name.View() + "\n")
+        if d.message != "" {
+                b.WriteString(d.message + "\n")
+        }
+        b.WriteString("\n1-9: toggle selection • enter: name/create dish • f: finish\n")
+        return paneStyle.Render(b.String())
 }
 
 var (
