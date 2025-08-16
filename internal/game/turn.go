@@ -1,13 +1,13 @@
 package game
 
 import (
-        "sort"
+	"sort"
 
-        "executive-chef/internal/customer"
-        "executive-chef/internal/deck"
-        "executive-chef/internal/dish"
-        "executive-chef/internal/ingredient"
-        "executive-chef/internal/player"
+	"executive-chef/internal/customer"
+	"executive-chef/internal/deck"
+	"executive-chef/internal/dish"
+	"executive-chef/internal/ingredient"
+	"executive-chef/internal/player"
 )
 
 // Turn represents a single turn in the game.
@@ -19,26 +19,29 @@ type Turn struct {
 	Actions <-chan Action
 }
 
-// DraftPhase performs the drafting phase of a turn. Ten cards are revealed
-// and the player may draft three of them.
+// DraftPhase performs the drafting phase of a turn. Ten cards are revealed and
+// the player may draft three of them in the first turn and five thereafter.
 func (t *Turn) DraftPhase() {
-        t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
-        reveal := t.Deck.Draw(10)
-        roleOrder := map[ingredient.Role]int{
-                ingredient.Protein:   0,
-                ingredient.Vegetable: 1,
-                ingredient.Carb:      2,
-        }
-        sort.Slice(reveal, func(i, j int) bool {
-                ri := roleOrder[reveal[i].Role]
-                rj := roleOrder[reveal[j].Role]
-                if ri != rj {
-                        return ri < rj
-                }
-                return reveal[i].Name < reveal[j].Name
-        })
-        remaining := 3
-        t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
+	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
+	reveal := t.Deck.Draw(10)
+	roleOrder := map[ingredient.Role]int{
+		ingredient.Protein:   0,
+		ingredient.Vegetable: 1,
+		ingredient.Carb:      2,
+	}
+	sort.Slice(reveal, func(i, j int) bool {
+		ri := roleOrder[reveal[i].Role]
+		rj := roleOrder[reveal[j].Role]
+		if ri != rj {
+			return ri < rj
+		}
+		return reveal[i].Name < reveal[j].Name
+	})
+	remaining := 3
+	if t.Number > 1 {
+		remaining = 5
+	}
+	t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
 	for remaining > 0 && len(reveal) > 0 {
 		act := <-t.Actions
 		sel, ok := act.(DraftSelectionAction)
