@@ -3,6 +3,7 @@ module executive-chef
 go 1.24.3
 
 require (
+	github.com/brianvoe/gofakeit/v7 v7.3.0
 	github.com/charmbracelet/bubbles v0.17.1
 	github.com/charmbracelet/bubbletea v1.3.6
 	github.com/charmbracelet/lipgloss v1.1.0
