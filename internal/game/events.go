@@ -36,6 +36,13 @@ type DraftOptionsEvent struct {
 
 func (e DraftOptionsEvent) EventType() string { return "draft_options" }
 
+// IngredientDraftedEvent announces that an ingredient has been drafted by the player.
+type IngredientDraftedEvent struct {
+	Ingredient ingredient.Ingredient
+}
+
+func (e IngredientDraftedEvent) EventType() string { return "ingredient_drafted" }
+
 // DesignOptionsEvent is sent when the player can design dishes from drafted ingredients.
 type DesignOptionsEvent struct {
 	Drafted []ingredient.Ingredient
