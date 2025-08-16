@@ -22,17 +22,9 @@ func main() {
 	events := make(chan game.Event)
 	actions := make(chan game.Action)
 
-	go func() {
-		turn := 1
-		for {
-			t := game.Turn{Number: turn, Deck: d, Player: p, Events: events, Actions: actions}
-			t.DraftPhase()
-			t.DesignPhase()
-			t.ServicePhase()
-			p.ResetTurn()
-			turn++
-		}
-	}()
+	g := game.New(ingredients, d, p, events, actions)
+
+	go g.Play()
 
 	if err := ui.Run(events, actions); err != nil {
 		log.Fatal(err)
