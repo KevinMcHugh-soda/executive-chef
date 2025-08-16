@@ -22,7 +22,10 @@ type uiMode interface {
 type model struct {
 	actions chan<- game.Action
 	mode    uiMode
+	events  []string
 }
+
+const maxEvents = 5
 
 func initialModel(actions chan<- game.Action) *model {
 	m := &model{actions: actions}
@@ -35,6 +38,13 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if e, ok := msg.(game.Event); ok {
+		m.events = append(m.events, eventString(e))
+		if len(m.events) > maxEvents {
+			m.events = m.events[len(m.events)-maxEvents:]
+		}
+	}
+
 	if newMode, cmd := m.mode.Update(m, msg); newMode != nil {
 		m.mode = newMode
 		initCmd := m.mode.Init(m)
@@ -45,7 +55,33 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	return m.mode.View(m)
+	main := m.mode.View(m)
+
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("Events") + "\n")
+	for _, e := range m.events {
+		b.WriteString(e + "\n")
+	}
+	logView := paneStyle.Render(b.String())
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
+}
+
+func eventString(e game.Event) string {
+	switch e := e.(type) {
+	case game.DraftOptionsEvent:
+		var names []string
+		for _, ing := range e.Reveal {
+			names = append(names, ing.Name)
+		}
+		return fmt.Sprintf("Draft: %s", strings.Join(names, ", "))
+	case game.DesignOptionsEvent:
+		return "Design phase begins"
+	case game.DishCreatedEvent:
+		return fmt.Sprintf("Dish created: %s", e.Dish.Name)
+	default:
+		return e.EventType()
+	}
 }
 
 // ---- Draft Mode ----
