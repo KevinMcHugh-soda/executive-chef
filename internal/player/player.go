@@ -27,19 +27,6 @@ func (p *Player) AddDish(d dish.Dish) {
 	p.Dishes = append(p.Dishes, d)
 }
 
-// UseIngredients removes the specified ingredients from the player's drafted list.
-// Each ingredient in the slice is removed once if present.
-func (p *Player) UseIngredients(ings []ingredient.Ingredient) {
-	for _, used := range ings {
-		for i, have := range p.Drafted {
-			if have == used {
-				p.Drafted = append(p.Drafted[:i], p.Drafted[i+1:]...)
-				break
-			}
-		}
-	}
-}
-
 // AddMoney increases the player's money by the given amount.
 func (p *Player) AddMoney(amount int) {
 	p.Money += amount

@@ -119,16 +119,6 @@ func (t *Turn) ServicePhase() {
 		if bestIdx >= 0 {
 			d := available[bestIdx]
 			chosen = &d
-			available = append(available[:bestIdx], available[bestIdx+1:]...)
-			t.Player.UseIngredients(d.Ingredients)
-			// Remove any dishes that can no longer be made with remaining ingredients.
-			filtered := available[:0]
-			for _, dish := range available {
-				if hasIngredients(t.Player.Drafted, dish.Ingredients) {
-					filtered = append(filtered, dish)
-				}
-			}
-			available = filtered
 			switch bestCraving {
 			case 0:
 				payment = 5
