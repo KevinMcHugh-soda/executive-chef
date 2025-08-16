@@ -80,9 +80,11 @@ func (t *Turn) DesignPhase() {
 func (t *Turn) ServicePhase() {
 	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
 	customers := customer.RandomCustomers(t.Player.Drafted, 3)
+	remaining := append([]ingredient.Ingredient(nil), t.Player.Drafted...)
+	used := []ingredient.Ingredient{}
 	var available []dish.Dish
 	for _, d := range t.Player.Dishes {
-		if hasIngredients(t.Player.Drafted, d.Ingredients) {
+		if hasIngredients(remaining, d.Ingredients) {
 			available = append(available, d)
 		}
 	}
@@ -120,11 +122,12 @@ func (t *Turn) ServicePhase() {
 			d := available[bestIdx]
 			chosen = &d
 			available = append(available[:bestIdx], available[bestIdx+1:]...)
-			t.Player.UseIngredients(d.Ingredients)
+			remaining = removeIngredients(remaining, d.Ingredients)
+			used = append(used, d.Ingredients...)
 			// Remove any dishes that can no longer be made with remaining ingredients.
 			filtered := available[:0]
 			for _, dish := range available {
-				if hasIngredients(t.Player.Drafted, dish.Ingredients) {
+				if hasIngredients(remaining, dish.Ingredients) {
 					filtered = append(filtered, dish)
 				}
 			}
@@ -154,6 +157,7 @@ func (t *Turn) ServicePhase() {
 			break
 		}
 	}
+	t.Player.UseIngredients(used)
 }
 
 func hasIngredients(have []ingredient.Ingredient, needed []ingredient.Ingredient) bool {
@@ -170,4 +174,16 @@ func hasIngredients(have []ingredient.Ingredient, needed []ingredient.Ingredient
 		}
 	}
 	return true
+}
+
+func removeIngredients(have []ingredient.Ingredient, used []ingredient.Ingredient) []ingredient.Ingredient {
+	for _, u := range used {
+		for i, h := range have {
+			if h == u {
+				have = append(have[:i], have[i+1:]...)
+				break
+			}
+		}
+	}
+	return have
 }
