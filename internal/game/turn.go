@@ -81,7 +81,7 @@ func (t *Turn) ServicePhase() {
 	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
 	customers := customer.RandomCustomers(t.Player.Drafted, 3)
 	available := append([]dish.Dish(nil), t.Player.Dishes...)
-	for _, c := range customers {
+	for i, c := range customers {
 		bestIdx := -1
 		bestScore := 0
 		for i, d := range available {
@@ -112,6 +112,18 @@ func (t *Turn) ServicePhase() {
 			available = append(available[:bestIdx], available[bestIdx+1:]...)
 		}
 		t.Events <- ServiceResultEvent{Customer: c, Dish: chosen}
+		if i < len(customers)-1 {
+			for {
+				if _, ok := (<-t.Actions).(ContinueAction); ok {
+					break
+				}
+			}
+		}
 	}
 	t.Events <- ServiceEndEvent{}
+	for {
+		if _, ok := (<-t.Actions).(ContinueAction); ok {
+			break
+		}
+	}
 }
