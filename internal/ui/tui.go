@@ -13,6 +13,8 @@ import (
 	"executive-chef/internal/ingredient"
 )
 
+const logWidth = 30
+
 // uiMode represents a UI mode for a game phase.
 type uiMode interface {
 	Init(*model) tea.Cmd
@@ -29,12 +31,13 @@ type model struct {
 	vp      viewport.Model
 	turn    int
 	phase   game.Phase
+	width   int
 }
 
 func initialModel(actions chan<- game.Action) *model {
 	m := &model{actions: actions}
 	m.mode = &draftMode{}
-	m.vp = viewport.New(20, 7)
+	m.vp = viewport.New(logWidth-2, 7)
 	return m
 }
 
@@ -55,8 +58,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if wm, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = wm.Width
+	}
+
 	var vpCmd tea.Cmd
 	m.vp, vpCmd = m.vp.Update(msg)
+	m.vp.Width = logWidth - 2
 
 	newMode, modeCmd := m.mode.Update(m, msg)
 	if newMode != nil {
@@ -70,9 +78,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) View() string {
 	main := m.mode.View(m)
-
 	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
-	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+	logView := logStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+
+	mainWidth := m.width - logWidth
+	if mainWidth < 0 {
+		mainWidth = 0
+	}
+	main = lipgloss.NewStyle().Width(mainWidth).Render(main)
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
 	status := statusStyle.Render(m.mode.Status(m))
@@ -351,6 +364,7 @@ var (
 	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
 	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
+	logStyle      = paneStyle.Copy().Width(logWidth)
 )
 
 // Run renders game events and sends player actions back to the game.
