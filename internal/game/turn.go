@@ -1,13 +1,13 @@
 package game
 
 import (
-        "sort"
+	"sort"
 
-        "executive-chef/internal/customer"
-        "executive-chef/internal/deck"
-        "executive-chef/internal/dish"
-        "executive-chef/internal/ingredient"
-        "executive-chef/internal/player"
+	"executive-chef/internal/customer"
+	"executive-chef/internal/deck"
+	"executive-chef/internal/dish"
+	"executive-chef/internal/ingredient"
+	"executive-chef/internal/player"
 )
 
 // Turn represents a single turn in the game.
@@ -22,23 +22,23 @@ type Turn struct {
 // DraftPhase performs the drafting phase of a turn. Ten cards are revealed
 // and the player may draft three of them.
 func (t *Turn) DraftPhase() {
-        t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
-        reveal := t.Deck.Draw(10)
-        roleOrder := map[ingredient.Role]int{
-                ingredient.Protein:   0,
-                ingredient.Vegetable: 1,
-                ingredient.Carb:      2,
-        }
-        sort.Slice(reveal, func(i, j int) bool {
-                ri := roleOrder[reveal[i].Role]
-                rj := roleOrder[reveal[j].Role]
-                if ri != rj {
-                        return ri < rj
-                }
-                return reveal[i].Name < reveal[j].Name
-        })
-        remaining := 3
-        t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
+	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
+	reveal := t.Deck.Draw(10)
+	roleOrder := map[ingredient.Role]int{
+		ingredient.Protein:   0,
+		ingredient.Vegetable: 1,
+		ingredient.Carb:      2,
+	}
+	sort.Slice(reveal, func(i, j int) bool {
+		ri := roleOrder[reveal[i].Role]
+		rj := roleOrder[reveal[j].Role]
+		if ri != rj {
+			return ri < rj
+		}
+		return reveal[i].Name < reveal[j].Name
+	})
+	remaining := 3
+	t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
 	for remaining > 0 && len(reveal) > 0 {
 		act := <-t.Actions
 		sel, ok := act.(DraftSelectionAction)
@@ -57,15 +57,17 @@ func (t *Turn) DraftPhase() {
 }
 
 // DesignPhase allows the player to combine drafted ingredients into named dishes.
-// The player can create multiple dishes until a FinishDesignAction is received.
+// The player can create up to two dishes this turn and may have up to ten dishes
+// overall. The phase ends when a FinishDesignAction is received.
 func (t *Turn) DesignPhase() {
 	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDesign}
 	t.Events <- DesignOptionsEvent{Drafted: t.Player.Drafted}
+	created := 0
 	for {
 		act := <-t.Actions
 		switch a := act.(type) {
 		case CreateDishAction:
-			if len(t.Player.Dishes) >= 2 || a.Name == "" {
+			if a.Name == "" || created >= 2 || len(t.Player.Dishes) >= 10 {
 				continue
 			}
 			used := make(map[int]bool)
@@ -84,6 +86,7 @@ func (t *Turn) DesignPhase() {
 			}
 			d := dish.Dish{Name: a.Name, Ingredients: dishIngs}
 			t.Player.AddDish(d)
+			created++
 			t.Events <- DishCreatedEvent{Dish: d}
 		case FinishDesignAction:
 			return
