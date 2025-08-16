@@ -130,7 +130,11 @@ func (d *draftMode) View(m *model) string {
 		if d.cursor == i {
 			cursor = ">"
 		}
-		b.WriteString(fmt.Sprintf("%s %s (%s)\n", cursor, ing.Name, ing.Role))
+		line := fmt.Sprintf("%s %s (%s)", cursor, ing.Name, ing.Role)
+		if d.cursor == i {
+			line = selectedStyle.Render(line)
+		}
+		b.WriteString(line + "\n")
 	}
 	return paneStyle.Render(b.String())
 }
@@ -217,7 +221,11 @@ func (d *designMode) View(m *model) string {
 		if d.selected[i] {
 			mark = "*"
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s (%s)\n", cursor, mark, ing.Name, ing.Role))
+		line := fmt.Sprintf("%s%s %s (%s)", cursor, mark, ing.Name, ing.Role)
+		if d.cursor == i || d.selected[i] {
+			line = selectedStyle.Render(line)
+		}
+		b.WriteString(line + "\n")
 	}
 	if len(d.dishes) > 0 {
 		b.WriteString("\nDishes:\n")
@@ -234,8 +242,9 @@ func (d *designMode) View(m *model) string {
 }
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true)
-	paneStyle  = lipgloss.NewStyle().Padding(0, 1)
+	titleStyle    = lipgloss.NewStyle().Bold(true)
+	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
+	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
 )
 
 // Run renders game events and sends player actions back to the game.
