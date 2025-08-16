@@ -1,12 +1,12 @@
 package customer
 
 import (
-        "math/rand"
-        "time"
+	"math/rand"
+	"time"
 
-        "github.com/brianvoe/gofakeit/v7"
+	"github.com/brianvoe/gofakeit/v7"
 
-        "executive-chef/internal/ingredient"
+	"executive-chef/internal/ingredient"
 )
 
 // Craving represents a combination of ingredients a customer wants.
@@ -16,20 +16,33 @@ type Craving struct {
 
 // Customer represents a single customer with ordered cravings and a name.
 type Customer struct {
-        Name     string
-        Cravings []Craving
+	Name     string
+	Cravings []Craving
 }
 
 // RandomCraving returns a Craving made of random ingredients.
+// Each ingredient in the resulting craving will be unique even if the
+// provided slice contains duplicates.
 func RandomCraving(ingredients []ingredient.Ingredient) Craving {
 	if len(ingredients) == 0 {
 		return Craving{}
 	}
-	n := rand.Intn(len(ingredients)) + 1
-	idxs := rand.Perm(len(ingredients))[:n]
+
+	// Deduplicate input ingredients so cravings never contain repeats.
+	unique := make([]ingredient.Ingredient, 0, len(ingredients))
+	seen := make(map[ingredient.Ingredient]bool)
+	for _, ing := range ingredients {
+		if !seen[ing] {
+			seen[ing] = true
+			unique = append(unique, ing)
+		}
+	}
+
+	n := rand.Intn(len(unique)) + 1
+	idxs := rand.Perm(len(unique))[:n]
 	combo := make([]ingredient.Ingredient, 0, n)
 	for _, i := range idxs {
-		combo = append(combo, ingredients[i])
+		combo = append(combo, unique[i])
 	}
 	return Craving{Ingredients: combo}
 }
@@ -40,11 +53,11 @@ func RandomCustomer(ingredients []ingredient.Ingredient, numCravings int) Custom
 	if numCravings <= 0 {
 		numCravings = 1
 	}
-        cravings := make([]Craving, numCravings)
-        for i := 0; i < numCravings; i++ {
-                cravings[i] = RandomCraving(ingredients)
-        }
-        return Customer{Name: gofakeit.Name(), Cravings: cravings}
+	cravings := make([]Craving, numCravings)
+	for i := 0; i < numCravings; i++ {
+		cravings[i] = RandomCraving(ingredients)
+	}
+	return Customer{Name: gofakeit.Name(), Cravings: cravings}
 }
 
 // RandomCustomers generates the specified number of customers.
@@ -58,6 +71,6 @@ func RandomCustomers(ingredients []ingredient.Ingredient, count int) []Customer 
 }
 
 func init() {
-        rand.Seed(time.Now().UnixNano())
-        gofakeit.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
+	gofakeit.Seed(time.Now().UnixNano())
 }
