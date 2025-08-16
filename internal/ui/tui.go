@@ -25,6 +25,8 @@ type model struct {
 	mode    uiMode
 	events  []string
 	vp      viewport.Model
+	turn    int
+	phase   game.Phase
 }
 
 func initialModel(actions chan<- game.Action) *model {
@@ -43,6 +45,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.events = append(m.events, eventString(e))
 		m.vp.SetContent(strings.Join(m.events, "\n"))
 		m.vp.GotoBottom()
+		if info, ok := e.(game.PhaseEvent); ok {
+			m.turn = info.Turn
+			m.phase = info.Phase
+		}
 	}
 
 	var vpCmd tea.Cmd
@@ -60,13 +66,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() string {
 	main := m.mode.View(m)
 
+	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
 	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
+	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
+	return lipgloss.JoinVertical(lipgloss.Left, info, content)
 }
 
 func eventString(e game.Event) string {
 	switch e := e.(type) {
+	case game.PhaseEvent:
+		return fmt.Sprintf("Turn %d: %s phase", e.Turn, e.Phase)
 	case game.DraftOptionsEvent:
 		var names []string
 		for _, ing := range e.Reveal {
@@ -267,21 +277,21 @@ func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 func (s *serviceMode) View(m *model) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Service Results") + "\n")
-        for _, r := range s.results {
-                var craving []string
-                if len(r.Customer.Cravings) > 0 {
-                        for _, ing := range r.Customer.Cravings[0].Ingredients {
-                                craving = append(craving, ing.Name)
-                        }
-                }
-                b.WriteString(fmt.Sprintf("%s: %s -> ", r.Customer.Name, strings.Join(craving, ", ")))
-                if r.Dish != nil {
-                        b.WriteString(r.Dish.Name)
-                } else {
-                        b.WriteString("no dish")
-                }
-                b.WriteString("\n")
-        }
+	for _, r := range s.results {
+		var craving []string
+		if len(r.Customer.Cravings) > 0 {
+			for _, ing := range r.Customer.Cravings[0].Ingredients {
+				craving = append(craving, ing.Name)
+			}
+		}
+		b.WriteString(fmt.Sprintf("%s: %s -> ", r.Customer.Name, strings.Join(craving, ", ")))
+		if r.Dish != nil {
+			b.WriteString(r.Dish.Name)
+		} else {
+			b.WriteString("no dish")
+		}
+		b.WriteString("\n")
+	}
 	if s.finished {
 		b.WriteString("\nPress q to quit\n")
 	}

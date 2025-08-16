@@ -11,6 +11,23 @@ type Event interface {
 	EventType() string
 }
 
+// Phase represents the current phase of a turn.
+type Phase string
+
+const (
+	PhaseDraft   Phase = "Draft"
+	PhaseDesign  Phase = "Design"
+	PhaseService Phase = "Service"
+)
+
+// PhaseEvent announces the current turn and phase of the game.
+type PhaseEvent struct {
+	Turn  int
+	Phase Phase
+}
+
+func (e PhaseEvent) EventType() string { return "phase" }
+
 // DraftOptionsEvent is sent when a new set of draftable ingredients should be shown.
 type DraftOptionsEvent struct {
 	Reveal []ingredient.Ingredient
