@@ -32,6 +32,7 @@ type model struct {
 	turn    int
 	phase   game.Phase
 	width   int
+	money   int
 }
 
 func initialModel(actions chan<- game.Action) *model {
@@ -56,6 +57,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.turn = info.Turn
 			m.phase = info.Phase
 		}
+		if pay, ok := e.(game.ServiceResultEvent); ok {
+			m.money = pay.Money
+		}
 	}
 
 	if wm, ok := msg.(tea.WindowSizeMsg); ok {
@@ -78,7 +82,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) View() string {
 	main := m.mode.View(m)
-	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
+	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s\nMoney: $%d", m.turn, m.phase, m.money))
 	logView := logStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	mainWidth := m.width - logWidth
@@ -107,6 +111,15 @@ func eventString(e game.Event) string {
 		return "Design phase begins"
 	case game.DishCreatedEvent:
 		return fmt.Sprintf("Dish created: %s", e.Dish.Name)
+	case game.ServiceResultEvent:
+		dishName := "no dish"
+		if e.Dish != nil {
+			dishName = e.Dish.Name
+		}
+		if e.Payment > 0 {
+			return fmt.Sprintf("%s served %s for $%d", e.Customer.Name, dishName, e.Payment)
+		}
+		return fmt.Sprintf("%s was not served", e.Customer.Name)
 	default:
 		return e.EventType()
 	}
@@ -346,6 +359,9 @@ func (s *serviceMode) View(m *model) string {
 			b.WriteString(s.current.Dish.Name)
 		} else {
 			b.WriteString("no dish")
+		}
+		if s.current.Payment > 0 {
+			b.WriteString(fmt.Sprintf(" ($%d)", s.current.Payment))
 		}
 		b.WriteString("\n")
 	}
