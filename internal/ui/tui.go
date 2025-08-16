@@ -302,29 +302,33 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					d.confirm = true
 					m.message = "press enter again to confirm"
 				} else {
-                                        name := strings.TrimSpace(d.name.Value())
-                                        if len(d.dishes) >= 2 {
-                                                m.message = "Maximum of 2 dishes reached"
-                                                break
-                                        }
-                                        if len(d.selected) == 0 {
-                                                m.message = "select at least one ingredient to create a dish!"
-                                        } else if name != "" {
-                                                var indices []int
-                                                for i := range d.drafted {
-                                                        if d.selected[i] {
-                                                                indices = append(indices, i)
-                                                        }
-                                                }
-                                                m.actions <- game.CreateDishAction{Name: name, Indices: indices}
-                                                m.message = ""
-                                        } else {
-                                                m.message = ""
-                                        }
-                                        d.confirm = false
-                                }
-                        }
-                case "tab":
+					name := strings.TrimSpace(d.name.Value())
+					if len(m.dishes) >= 10 {
+						m.message = "Maximum of 10 dishes reached"
+						break
+					}
+					if len(d.dishes) >= 2 {
+						m.message = "Maximum of 2 dishes this turn reached"
+						break
+					}
+					if len(d.selected) == 0 {
+						m.message = "select at least one ingredient to create a dish!"
+					} else if name != "" {
+						var indices []int
+						for i := range d.drafted {
+							if d.selected[i] {
+								indices = append(indices, i)
+							}
+						}
+						m.actions <- game.CreateDishAction{Name: name, Indices: indices}
+						m.message = ""
+					} else {
+						m.message = ""
+					}
+					d.confirm = false
+				}
+			}
+		case "tab":
 			d.confirm = false
 			m.message = ""
 			if d.selecting {
