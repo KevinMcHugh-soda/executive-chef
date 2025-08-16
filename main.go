@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"executive-chef/internal/deck"
@@ -23,28 +22,21 @@ func main() {
 	events := make(chan game.Event)
 	actions := make(chan game.Action)
 
-	t := game.Turn{Number: 1, Deck: d, Player: p, Events: events, Actions: actions}
-
 	go func() {
-		t.DraftPhase()
-		t.DesignPhase()
-		t.ServicePhase()
-		close(events)
+		turn := 1
+		for {
+			t := game.Turn{Number: turn, Deck: d, Player: p, Events: events, Actions: actions}
+			t.DraftPhase()
+			t.DesignPhase()
+			t.ServicePhase()
+			p.ResetTurn()
+			turn++
+		}
 	}()
 
 	if err := ui.Run(events, actions); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Your Dishes:")
-	for _, dish := range p.Dishes {
-		fmt.Printf("- %s: ", dish.Name)
-		for i, ing := range dish.Ingredients {
-			if i > 0 {
-				fmt.Print(", ")
-			}
-			fmt.Print(ing.Name)
-		}
-		fmt.Println()
-	}
+	// Game ended
 }

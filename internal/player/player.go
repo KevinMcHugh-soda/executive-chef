@@ -25,3 +25,9 @@ func (p *Player) Add(ing ingredient.Ingredient) {
 func (p *Player) AddDish(d dish.Dish) {
 	p.Dishes = append(p.Dishes, d)
 }
+
+// ResetTurn clears drafted ingredients and dishes for a new turn.
+func (p *Player) ResetTurn() {
+	p.Drafted = nil
+	p.Dishes = nil
+}

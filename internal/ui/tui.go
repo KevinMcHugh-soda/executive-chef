@@ -13,6 +13,8 @@ import (
 	"executive-chef/internal/ingredient"
 )
 
+const logWidth = 30
+
 // uiMode represents a UI mode for a game phase.
 type uiMode interface {
 	Init(*model) tea.Cmd
@@ -30,12 +32,13 @@ type model struct {
 	turn    int
 	phase   game.Phase
 	message string
+	width   int
 }
 
 func initialModel(actions chan<- game.Action) *model {
 	m := &model{actions: actions}
 	m.mode = &draftMode{}
-	m.vp = viewport.New(20, 7)
+	m.vp = viewport.New(logWidth-2, 7)
 	return m
 }
 
@@ -56,8 +59,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if wm, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = wm.Width
+	}
+
 	var vpCmd tea.Cmd
 	m.vp, vpCmd = m.vp.Update(msg)
+	m.vp.Width = logWidth - 2
 
 	newMode, modeCmd := m.mode.Update(m, msg)
 	if newMode != nil {
@@ -71,9 +79,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) View() string {
 	main := m.mode.View(m)
-
 	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
-	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+	logView := logStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+
+	mainWidth := m.width - logWidth
+	if mainWidth < 0 {
+		mainWidth = 0
+	}
+	main = lipgloss.NewStyle().Width(mainWidth).Render(main)
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
 	status := statusStyle.Render(m.mode.Status(m))
@@ -199,7 +212,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 		d.selected = make(map[int]bool)
 		d.confirm = false
 	case game.ServiceResultEvent:
-		return &serviceMode{results: []game.ServiceResultEvent{msg}}, nil
+		return &serviceMode{current: &msg}, nil
 	case tea.KeyMsg:
 		if msg.String() != "enter" {
 			d.confirm = false
@@ -300,7 +313,7 @@ func (d *designMode) Status(m *model) string {
 
 // ---- Service Mode ----
 type serviceMode struct {
-	results  []game.ServiceResultEvent
+	current  *game.ServiceResultEvent
 	finished bool
 }
 
@@ -312,13 +325,17 @@ func (s *serviceMode) Init(m *model) tea.Cmd {
 func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	switch msg := msg.(type) {
 	case game.ServiceResultEvent:
-		s.results = append(s.results, msg)
+		s.current = &msg
 	case game.ServiceEndEvent:
 		s.finished = true
+	case game.DraftOptionsEvent:
+		return &draftMode{draft: msg.Reveal}, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return nil, tea.Quit
+		case "enter":
+			m.actions <- game.ContinueAction{}
 		}
 	}
 	return nil, nil
@@ -326,17 +343,17 @@ func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 
 func (s *serviceMode) View(m *model) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Service Results") + "\n")
-	for _, r := range s.results {
+	b.WriteString(titleStyle.Render("Service") + "\n")
+	if s.current != nil {
 		var craving []string
-		if len(r.Customer.Cravings) > 0 {
-			for _, ing := range r.Customer.Cravings[0].Ingredients {
+		if len(s.current.Customer.Cravings) > 0 {
+			for _, ing := range s.current.Customer.Cravings[0].Ingredients {
 				craving = append(craving, ing.Name)
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s: %s -> ", r.Customer.Name, strings.Join(craving, ", ")))
-		if r.Dish != nil {
-			b.WriteString(r.Dish.Name)
+		b.WriteString(fmt.Sprintf("%s: %s -> ", s.current.Customer.Name, strings.Join(craving, ", ")))
+		if s.current.Dish != nil {
+			b.WriteString(s.current.Dish.Name)
 		} else {
 			b.WriteString("no dish")
 		}
@@ -347,9 +364,9 @@ func (s *serviceMode) View(m *model) string {
 
 func (s *serviceMode) Status(m *model) string {
 	if s.finished {
-		return "q: quit"
+		return "enter: next turn • q: quit"
 	}
-	return ""
+	return "enter: next customer • q: quit"
 }
 
 var (
@@ -358,6 +375,7 @@ var (
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
 	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
 	messageStyle  = lipgloss.NewStyle().Padding(0, 1)
+	logStyle      = paneStyle.Copy().Width(logWidth)
 )
 
 // Run renders game events and sends player actions back to the game.
