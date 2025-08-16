@@ -27,6 +27,7 @@ type model struct {
 	mode    uiMode
 	events  []string
 	vp      viewport.Model
+	width   int
 	turn    int
 	phase   game.Phase
 }
@@ -34,7 +35,7 @@ type model struct {
 func initialModel(actions chan<- game.Action) *model {
 	m := &model{actions: actions}
 	m.mode = &draftMode{}
-	m.vp = viewport.New(20, 7)
+	m.vp = viewport.New(28, 7)
 	return m
 }
 
@@ -43,11 +44,16 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if e, ok := msg.(game.Event); ok {
-		m.events = append(m.events, eventString(e))
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.vp.Width = 28
+		m.vp.Height = msg.Height - 4
+	case game.Event:
+		m.events = append(m.events, eventString(msg))
 		m.vp.SetContent(strings.Join(m.events, "\n"))
 		m.vp.GotoBottom()
-		if info, ok := e.(game.PhaseEvent); ok {
+		if info, ok := msg.(game.PhaseEvent); ok {
 			m.turn = info.Turn
 			m.phase = info.Phase
 		}
@@ -67,10 +73,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	main := m.mode.View(m)
+	mainView := m.mode.View(m)
+	mainWidth := m.width - 30
+	if mainWidth < 0 {
+		mainWidth = 0
+	}
+	main := lipgloss.NewStyle().Width(mainWidth).Render(mainView)
 
 	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
-	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+	logView := paneStyle.Width(30).Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
 	status := statusStyle.Render(m.mode.Status(m))
