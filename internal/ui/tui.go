@@ -65,6 +65,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ingredients = append(m.ingredients, ev.Ingredient)
 		case game.DishCreatedEvent:
 			m.dishes = append(m.dishes, ev.Dish)
+		case game.DishDeletedEvent:
+			if len(m.dishes) > 0 {
+				m.dishes = m.dishes[:len(m.dishes)-1]
+			}
 		case game.ServiceEndEvent:
 			m.ingredients = nil
 		}
@@ -160,6 +164,8 @@ func eventString(e game.Event) string {
 		return "Design phase begins"
 	case game.DishCreatedEvent:
 		return fmt.Sprintf("Dish created: %s", e.Dish.Name)
+	case game.DishDeletedEvent:
+		return fmt.Sprintf("Dish deleted: %s", e.Dish.Name)
 	case game.ServiceResultEvent:
 		dishName := "no dish"
 		if e.Dish != nil {
@@ -271,6 +277,12 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
 		d.confirm = false
+	case game.DishDeletedEvent:
+		if len(d.dishes) > 0 {
+			m.message = fmt.Sprintf("Deleted dish '%s'", d.dishes[len(d.dishes)-1])
+			d.dishes = d.dishes[:len(d.dishes)-1]
+		}
+		d.confirm = false
 	case game.ServiceResultEvent:
 		return &serviceMode{current: &msg}, nil
 	case tea.KeyMsg:
@@ -298,19 +310,19 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					d.selected[d.cursor] = true
 				}
 			} else {
-				if !d.confirm {
+				if len(m.dishes) >= 10 || len(d.dishes) >= 2 {
+					if !d.confirm {
+						d.confirm = true
+						m.message = "dish limit reached. press enter again to finish"
+					} else {
+						m.actions <- game.FinishDesignAction{}
+						return nil, nil
+					}
+				} else if !d.confirm {
 					d.confirm = true
 					m.message = "press enter again to confirm"
 				} else {
 					name := strings.TrimSpace(d.name.Value())
-					if len(m.dishes) >= 10 {
-						m.message = "Maximum of 10 dishes reached"
-						break
-					}
-					if len(d.dishes) >= 2 {
-						m.message = "Maximum of 2 dishes this turn reached"
-						break
-					}
 					if len(d.selected) == 0 {
 						m.message = "select at least one ingredient to create a dish!"
 					} else {
@@ -339,6 +351,10 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					}
 					d.confirm = false
 				}
+			}
+		case "ctrl+d":
+			if len(d.dishes) > 0 {
+				m.actions <- game.DeleteDishAction{}
 			}
 		case "tab":
 			d.confirm = false
@@ -390,7 +406,7 @@ func (d *designMode) View(m *model) string {
 }
 
 func (d *designMode) Status(m *model) string {
-	return "up/down: move • enter: select • tab: name • enter x2: create dish • f: finish • q: quit"
+	return "up/down: move • enter: select • tab: name • enter x2: create dish • ctrl+d: delete • f: finish • q: quit"
 }
 
 // ---- Service Mode ----

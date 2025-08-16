@@ -91,6 +91,14 @@ func (t *Turn) DesignPhase() {
 			t.Player.AddDish(d)
 			created++
 			t.Events <- DishCreatedEvent{Dish: d}
+		case DeleteDishAction:
+			if created > 0 {
+				d, ok := t.Player.RemoveLastDish()
+				if ok {
+					created--
+					t.Events <- DishDeletedEvent{Dish: d}
+				}
+			}
 		case FinishDesignAction:
 			return
 		}

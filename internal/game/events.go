@@ -57,6 +57,13 @@ type DishCreatedEvent struct {
 
 func (e DishCreatedEvent) EventType() string { return "dish_created" }
 
+// DishDeletedEvent notifies the UI that a dish has been deleted.
+type DishDeletedEvent struct {
+	Dish dish.Dish
+}
+
+func (e DishDeletedEvent) EventType() string { return "dish_deleted" }
+
 // ServiceResultEvent reports which dish a customer selected.
 // Dish will be nil if no available dish satisfies the customer's cravings.
 type ServiceResultEvent struct {
@@ -92,6 +99,11 @@ type CreateDishAction struct {
 }
 
 func (a CreateDishAction) ActionType() string { return "create_dish" }
+
+// DeleteDishAction removes the most recently created dish.
+type DeleteDishAction struct{}
+
+func (a DeleteDishAction) ActionType() string { return "delete_dish" }
 
 // FinishDesignAction signals that the player is done designing dishes.
 type FinishDesignAction struct{}

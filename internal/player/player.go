@@ -27,6 +27,17 @@ func (p *Player) AddDish(d dish.Dish) {
 	p.Dishes = append(p.Dishes, d)
 }
 
+// RemoveLastDish removes and returns the most recently added dish.
+// The second return value is false if there are no dishes to remove.
+func (p *Player) RemoveLastDish() (dish.Dish, bool) {
+	if len(p.Dishes) == 0 {
+		return dish.Dish{}, false
+	}
+	d := p.Dishes[len(p.Dishes)-1]
+	p.Dishes = p.Dishes[:len(p.Dishes)-1]
+	return d, true
+}
+
 // AddMoney increases the player's money by the given amount.
 func (p *Player) AddMoney(amount int) {
 	p.Money += amount
