@@ -106,6 +106,7 @@ type designMode struct {
 	selected map[int]bool
 	name     textinput.Model
 	message  string
+	dishes   []string
 }
 
 func (d *designMode) Init(m *model) tea.Cmd {
@@ -113,6 +114,7 @@ func (d *designMode) Init(m *model) tea.Cmd {
 	d.name = textinput.New()
 	d.name.Placeholder = "Dish name"
 	d.name.Focus()
+	d.dishes = []string{}
 	return nil
 }
 
@@ -121,6 +123,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	d.name, cmd = d.name.Update(msg)
 	switch msg := msg.(type) {
 	case game.DishCreatedEvent:
+		d.dishes = append(d.dishes, msg.Dish.Name)
 		d.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
@@ -145,6 +148,10 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 			}
 		case "enter":
 			name := strings.TrimSpace(d.name.Value())
+			if len(d.dishes) >= 2 {
+				d.message = "Maximum of 2 dishes reached"
+				break
+			}
 			if name != "" && len(d.selected) > 0 {
 				var indices []int
 				for i := range d.drafted {
@@ -175,6 +182,12 @@ func (d *designMode) View(m *model) string {
 			mark = "*"
 		}
 		b.WriteString(fmt.Sprintf("%s%s %s (%s)\n", cursor, mark, ing.Name, ing.Role))
+	}
+	if len(d.dishes) > 0 {
+		b.WriteString("\nDishes:\n")
+		for _, name := range d.dishes {
+			b.WriteString("- " + name + "\n")
+		}
 	}
 	b.WriteString("\n" + d.name.View() + "\n")
 	if d.message != "" {
