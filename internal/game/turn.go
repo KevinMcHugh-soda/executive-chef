@@ -10,6 +10,7 @@ import (
 
 // Turn represents a single turn in the game.
 type Turn struct {
+	Number  int
 	Deck    *deck.Deck
 	Player  *player.Player
 	Events  chan<- Event
@@ -19,6 +20,7 @@ type Turn struct {
 // DraftPhase performs the drafting phase of a turn. Ten cards are revealed
 // and the player may draft three of them.
 func (t *Turn) DraftPhase() {
+	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
 	reveal := t.Deck.Draw(10)
 	remaining := 3
 	t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
@@ -41,6 +43,7 @@ func (t *Turn) DraftPhase() {
 // DesignPhase allows the player to combine drafted ingredients into named dishes.
 // The player can create multiple dishes until a FinishDesignAction is received.
 func (t *Turn) DesignPhase() {
+	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDesign}
 	t.Events <- DesignOptionsEvent{Drafted: t.Player.Drafted}
 	for {
 		act := <-t.Actions
@@ -74,6 +77,7 @@ func (t *Turn) DesignPhase() {
 
 // ServicePhase presents dishes to customers who choose based on their cravings.
 func (t *Turn) ServicePhase() {
+	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
 	customers := customer.RandomCustomers(t.Player.Drafted, 3)
 	available := append([]dish.Dish(nil), t.Player.Dishes...)
 	for _, c := range customers {

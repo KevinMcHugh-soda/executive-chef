@@ -23,7 +23,7 @@ func main() {
 	events := make(chan game.Event)
 	actions := make(chan game.Action)
 
-	t := game.Turn{Deck: d, Player: p, Events: events, Actions: actions}
+	t := game.Turn{Number: 1, Deck: d, Player: p, Events: events, Actions: actions}
 
 	go func() {
 		t.DraftPhase()

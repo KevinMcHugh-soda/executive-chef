@@ -27,6 +27,8 @@ type model struct {
 	mode    uiMode
 	events  []string
 	vp      viewport.Model
+	turn    int
+	phase   game.Phase
 }
 
 func initialModel(actions chan<- game.Action) *model {
@@ -45,32 +47,40 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.events = append(m.events, eventString(e))
 		m.vp.SetContent(strings.Join(m.events, "\n"))
 		m.vp.GotoBottom()
+		if info, ok := e.(game.PhaseEvent); ok {
+			m.turn = info.Turn
+			m.phase = info.Phase
+		}
 	}
 
 	var vpCmd tea.Cmd
 	m.vp, vpCmd = m.vp.Update(msg)
 
-	if newMode, cmd := m.mode.Update(m, msg); newMode != nil {
+	newMode, modeCmd := m.mode.Update(m, msg)
+	if newMode != nil {
 		m.mode = newMode
 		initCmd := m.mode.Init(m)
-		return m, tea.Batch(cmd, initCmd, vpCmd)
+		return m, tea.Batch(modeCmd, initCmd, vpCmd)
 	}
 
-	return m, tea.Batch(vpCmd)
+	return m, tea.Batch(vpCmd, modeCmd)
 }
 
 func (m *model) View() string {
 	main := m.mode.View(m)
 
+	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
 	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
 	status := statusStyle.Render(m.mode.Status(m))
-	return lipgloss.JoinVertical(lipgloss.Left, content, status)
+	return lipgloss.JoinVertical(lipgloss.Left, info, content, status)
 }
 
 func eventString(e game.Event) string {
 	switch e := e.(type) {
+	case game.PhaseEvent:
+		return fmt.Sprintf("Turn %d: %s phase", e.Turn, e.Phase)
 	case game.DraftOptionsEvent:
 		var names []string
 		for _, ing := range e.Reveal {
@@ -285,7 +295,7 @@ func (s *serviceMode) View(m *model) string {
 				craving = append(craving, ing.Name)
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s -> ", strings.Join(craving, ", ")))
+		b.WriteString(fmt.Sprintf("%s: %s -> ", r.Customer.Name, strings.Join(craving, ", ")))
 		if r.Dish != nil {
 			b.WriteString(r.Dish.Name)
 		} else {
