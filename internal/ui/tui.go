@@ -1,8 +1,16 @@
 package ui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"fmt"
 
-type model struct{}
+	tea "github.com/charmbracelet/bubbletea"
+
+	"executive-chef/internal/ingredient"
+)
+
+type model struct {
+	ingredients []ingredient.Ingredient
+}
 
 func (m model) Init() tea.Cmd { return nil }
 
@@ -16,11 +24,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return "Welcome to Executive Chef\n"
+	s := "Ingredients:\n"
+	for _, ing := range m.ingredients {
+		s += fmt.Sprintf("- %s (%s)\n", ing.Name, ing.Role)
+	}
+	return s
 }
 
-func Run() error {
-	p := tea.NewProgram(model{})
+func Run(ingredients []ingredient.Ingredient) error {
+	p := tea.NewProgram(model{ingredients: ingredients})
 	_, err := p.Run()
 	return err
 }
