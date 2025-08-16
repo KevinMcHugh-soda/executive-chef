@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"executive-chef/internal/deck"
+	"executive-chef/internal/dish"
+	"executive-chef/internal/ingredient"
 	"executive-chef/internal/player"
 )
 
@@ -38,5 +40,53 @@ func (t *Turn) DraftPhase() {
 		chosen := reveal[n-1]
 		t.Player.Add(chosen)
 		reveal = append(reveal[:n-1], reveal[n:]...)
+	}
+}
+
+// DesignPhase allows the player to combine drafted ingredients into named dishes.
+// The player can create multiple dishes until they enter "done" as the dish name.
+func (t *Turn) DesignPhase() {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("Enter dish name (or 'done' to finish): ")
+		name, _ := reader.ReadString('\n')
+		name = strings.TrimSpace(name)
+		if strings.EqualFold(name, "done") || name == "" {
+			break
+		}
+
+		if len(t.Player.Drafted) == 0 {
+			fmt.Println("No ingredients available to create dishes.")
+			break
+		}
+
+		fmt.Println("Available ingredients:")
+		for i, ing := range t.Player.Drafted {
+			fmt.Printf("%d) %s (%s)\n", i+1, ing.Name, ing.Role)
+		}
+		fmt.Print("Choose ingredient numbers separated by spaces: ")
+		input, _ := reader.ReadString('\n')
+		fields := strings.Fields(input)
+
+		var dishIngs []ingredient.Ingredient
+		used := make(map[int]bool)
+		valid := true
+		for _, f := range fields {
+			idx, err := strconv.Atoi(f)
+			if err != nil || idx < 1 || idx > len(t.Player.Drafted) || used[idx] {
+				fmt.Println("Invalid ingredient selection.")
+				valid = false
+				break
+			}
+			used[idx] = true
+			dishIngs = append(dishIngs, t.Player.Drafted[idx-1])
+		}
+		if !valid || len(dishIngs) == 0 {
+			fmt.Println("No dish created.")
+			continue
+		}
+
+		t.Player.AddDish(dish.Dish{Name: name, Ingredients: dishIngs})
+		fmt.Printf("Added dish '%s'!\n", name)
 	}
 }
