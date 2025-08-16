@@ -95,9 +95,14 @@ func (m *model) View() string {
 	main := m.mode.View(m)
 
 	var infoBuilder strings.Builder
-	infoBuilder.WriteString(titleStyle.Render("Game Info") + "\n")
-  infoBuilder.WriteString(fmt.Sprintf("Turn: %d\nPhase: %s\nMoney: $%d", m.turn, m.phase, m.money))
-	infoBuilder.WriteString("Dishes:\n")
+        infoBuilder.WriteString(titleStyle.Render("Game Info") + "\n")
+        infoBuilder.WriteString(
+                fmt.Sprintf(
+                        "Turn: %d\nPhase: %s\nMoney: $%d\n",
+                        m.turn, m.phase, m.money,
+                ),
+        )
+        infoBuilder.WriteString("Dishes:\n")
 	if len(m.dishes) == 0 {
 		infoBuilder.WriteString("  (none)\n")
 	} else {
