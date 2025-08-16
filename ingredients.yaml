@@ -1,0 +1,6 @@
+- name: Chicken
+  role: Protein
+- name: Rice
+  role: Carb
+- name: Broccoli
+  role: Vegetable
