@@ -44,9 +44,11 @@ func (m *model) Init() tea.Cmd {
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if e, ok := msg.(game.Event); ok {
-		m.events = append(m.events, eventString(e))
-		m.vp.SetContent(strings.Join(m.events, "\n"))
-		m.vp.GotoBottom()
+		if str := eventString(e); str != "" {
+			m.events = append(m.events, str)
+			m.vp.SetContent(strings.Join(m.events, "\n"))
+			m.vp.GotoBottom()
+		}
 		if info, ok := e.(game.PhaseEvent); ok {
 			m.turn = info.Turn
 			m.phase = info.Phase
@@ -82,11 +84,12 @@ func eventString(e game.Event) string {
 	case game.PhaseEvent:
 		return fmt.Sprintf("Turn %d: %s phase", e.Turn, e.Phase)
 	case game.DraftOptionsEvent:
-		var names []string
-		for _, ing := range e.Reveal {
-			names = append(names, ing.Name)
+		if e.Picks == 3 {
+			return "Draft phase started"
 		}
-		return fmt.Sprintf("Draft: %s", strings.Join(names, ", "))
+		return ""
+	case game.IngredientDraftedEvent:
+		return fmt.Sprintf("Ingredient drafted: %s", e.Ingredient.Name)
 	case game.DesignOptionsEvent:
 		return "Design phase begins"
 	case game.DishCreatedEvent:

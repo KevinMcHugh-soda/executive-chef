@@ -32,6 +32,7 @@ func (t *Turn) DraftPhase() {
 		}
 		chosen := reveal[sel.Index]
 		t.Player.Add(chosen)
+		t.Events <- IngredientDraftedEvent{Ingredient: chosen}
 		reveal = append(reveal[:sel.Index], reveal[sel.Index+1:]...)
 		remaining--
 		if remaining > 0 && len(reveal) > 0 {
