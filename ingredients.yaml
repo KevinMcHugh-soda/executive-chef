@@ -4,3 +4,17 @@
   role: Carb
 - name: Broccoli
   role: Vegetable
+- name: Beef
+  role: Protein
+- name: Pork
+  role: Protein
+- name: Salmon
+  role: Protein
+- name: Potato
+  role: Carb
+- name: Bread
+  role: Carb
+- name: Carrot
+  role: Vegetable
+- name: Spinach
+  role: Vegetable
