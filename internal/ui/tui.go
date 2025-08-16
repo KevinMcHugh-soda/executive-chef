@@ -150,7 +150,7 @@ func eventString(e game.Event) string {
 	case game.PhaseEvent:
 		return fmt.Sprintf("Turn %d: %s phase", e.Turn, e.Phase)
 	case game.DraftOptionsEvent:
-		if e.Picks == 3 {
+		if len(e.Reveal) == 10 {
 			return "Draft phase started"
 		}
 		return ""

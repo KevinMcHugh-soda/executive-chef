@@ -19,8 +19,8 @@ type Turn struct {
 	Actions <-chan Action
 }
 
-// DraftPhase performs the drafting phase of a turn. Ten cards are revealed
-// and the player may draft three of them.
+// DraftPhase performs the drafting phase of a turn. Ten cards are revealed and
+// the player may draft three of them in the first turn and five thereafter.
 func (t *Turn) DraftPhase() {
 	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
 	reveal := t.Deck.Draw(10)
@@ -38,6 +38,9 @@ func (t *Turn) DraftPhase() {
 		return reveal[i].Name < reveal[j].Name
 	})
 	remaining := 3
+	if t.Number > 1 {
+		remaining = 5
+	}
 	t.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
 	for remaining > 0 && len(reveal) > 0 {
 		act := <-t.Actions
