@@ -3,7 +3,10 @@ package main
 import (
 	"log"
 
+	"executive-chef/internal/deck"
+	"executive-chef/internal/game"
 	"executive-chef/internal/ingredient"
+	"executive-chef/internal/player"
 	"executive-chef/internal/ui"
 )
 
@@ -13,7 +16,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := ui.Run(ingredients); err != nil {
+	d := deck.New(ingredients)
+	p := player.New()
+
+	t := game.Turn{Deck: d, Player: p}
+	t.DraftPhase()
+
+	if err := ui.Run(p.Drafted); err != nil {
 		log.Fatal(err)
 	}
 }
