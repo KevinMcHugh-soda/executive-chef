@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"executive-chef/internal/dish"
 	"executive-chef/internal/game"
 	"executive-chef/internal/ingredient"
 )
@@ -25,12 +26,14 @@ type uiMode interface {
 }
 
 type model struct {
-	actions chan<- game.Action
-	mode    uiMode
-	events  []string
-	vp      viewport.Model
-	turn    int
-	phase   game.Phase
+	actions     chan<- game.Action
+	mode        uiMode
+	events      []string
+	vp          viewport.Model
+	turn        int
+	phase       game.Phase
+	dishes      []dish.Dish
+	ingredients []ingredient.Ingredient
 	message string
 	width   int
 }
@@ -53,9 +56,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.vp.SetContent(strings.Join(m.events, "\n"))
 			m.vp.GotoBottom()
 		}
-		if info, ok := e.(game.PhaseEvent); ok {
-			m.turn = info.Turn
-			m.phase = info.Phase
+		switch ev := e.(type) {
+		case game.PhaseEvent:
+			m.turn = ev.Turn
+			m.phase = ev.Phase
+		case game.IngredientDraftedEvent:
+			m.ingredients = append(m.ingredients, ev.Ingredient)
+		case game.DishCreatedEvent:
+			m.dishes = append(m.dishes, ev.Dish)
+		case game.ServiceEndEvent:
+			m.ingredients = nil
 		}
 	}
 
@@ -79,8 +89,24 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) View() string {
 	main := m.mode.View(m)
-	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s", m.turn, m.phase))
-	logView := logStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+
+	var infoBuilder strings.Builder
+	infoBuilder.WriteString(titleStyle.Render("Game Info") + "\n")
+	infoBuilder.WriteString(fmt.Sprintf("Turn: %d\nPhase: %s\n", m.turn, m.phase))
+	infoBuilder.WriteString("Dishes:\n")
+	if len(m.dishes) == 0 {
+		infoBuilder.WriteString("  (none)\n")
+	} else {
+		for _, d := range m.dishes {
+			name := d.Name
+			if !m.hasIngredients(d) {
+				name = missingStyle.Render(name)
+			}
+			infoBuilder.WriteString("- " + name + "\n")
+		}
+	}
+	info := paneStyle.Render(infoBuilder.String())
+	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	mainWidth := m.width - logWidth
 	if mainWidth < 0 {
@@ -92,6 +118,22 @@ func (m *model) View() string {
 	status := statusStyle.Render(m.mode.Status(m))
 	message := messageStyle.Render(m.message)
 	return lipgloss.JoinVertical(lipgloss.Left, info, content, status, message)
+}
+
+func (m *model) hasIngredients(d dish.Dish) bool {
+	for _, need := range d.Ingredients {
+		found := false
+		for _, have := range m.ingredients {
+			if have == need {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func eventString(e game.Event) string {
@@ -373,6 +415,7 @@ var (
 	titleStyle    = lipgloss.NewStyle().Bold(true)
 	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
+	missingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
 	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
 	messageStyle  = lipgloss.NewStyle().Padding(0, 1)
 	logStyle      = paneStyle.Copy().Width(logWidth)
