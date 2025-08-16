@@ -80,7 +80,12 @@ func (t *Turn) DesignPhase() {
 func (t *Turn) ServicePhase() {
 	t.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
 	customers := customer.RandomCustomers(t.Player.Drafted, 3)
-	available := append([]dish.Dish(nil), t.Player.Dishes...)
+	var available []dish.Dish
+	for _, d := range t.Player.Dishes {
+		if hasIngredients(t.Player.Drafted, d.Ingredients) {
+			available = append(available, d)
+		}
+	}
 	for i, c := range customers {
 		bestIdx := -1
 		bestScore := 0
@@ -140,4 +145,20 @@ func (t *Turn) ServicePhase() {
 			break
 		}
 	}
+}
+
+func hasIngredients(have []ingredient.Ingredient, needed []ingredient.Ingredient) bool {
+	for _, n := range needed {
+		found := false
+		for _, h := range have {
+			if h == n {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

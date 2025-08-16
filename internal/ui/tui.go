@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"executive-chef/internal/dish"
 	"executive-chef/internal/game"
 	"executive-chef/internal/ingredient"
 )
@@ -25,12 +26,15 @@ type uiMode interface {
 }
 
 type model struct {
-	actions chan<- game.Action
-	mode    uiMode
-	events  []string
-	vp      viewport.Model
-	turn    int
-	phase   game.Phase
+	actions     chan<- game.Action
+	mode        uiMode
+	events      []string
+	vp          viewport.Model
+	turn        int
+	phase       game.Phase
+	dishes      []dish.Dish
+	ingredients []ingredient.Ingredient
+	message string
 	width   int
 	money   int
 }
@@ -53,9 +57,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.vp.SetContent(strings.Join(m.events, "\n"))
 			m.vp.GotoBottom()
 		}
-		if info, ok := e.(game.PhaseEvent); ok {
-			m.turn = info.Turn
-			m.phase = info.Phase
+		switch ev := e.(type) {
+		case game.PhaseEvent:
+			m.turn = ev.Turn
+			m.phase = ev.Phase
+		case game.IngredientDraftedEvent:
+			m.ingredients = append(m.ingredients, ev.Ingredient)
+		case game.DishCreatedEvent:
+			m.dishes = append(m.dishes, ev.Dish)
+		case game.ServiceEndEvent:
+			m.ingredients = nil
 		}
 		if pay, ok := e.(game.ServiceResultEvent); ok {
 			m.money = pay.Money
@@ -82,8 +93,24 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) View() string {
 	main := m.mode.View(m)
-	info := paneStyle.Render(titleStyle.Render("Game Info") + "\n" + fmt.Sprintf("Turn: %d\nPhase: %s\nMoney: $%d", m.turn, m.phase, m.money))
-	logView := logStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
+
+	var infoBuilder strings.Builder
+	infoBuilder.WriteString(titleStyle.Render("Game Info") + "\n")
+  infoBuilder.WriteString(fmt.Sprintf("Turn: %d\nPhase: %s\nMoney: $%d", m.turn, m.phase, m.money))
+	infoBuilder.WriteString("Dishes:\n")
+	if len(m.dishes) == 0 {
+		infoBuilder.WriteString("  (none)\n")
+	} else {
+		for _, d := range m.dishes {
+			name := d.Name
+			if !m.hasIngredients(d) {
+				name = missingStyle.Render(name)
+			}
+			infoBuilder.WriteString("- " + name + "\n")
+		}
+	}
+	info := paneStyle.Render(infoBuilder.String())
+	logView := paneStyle.Render(titleStyle.Render("Events") + "\n" + m.vp.View())
 
 	mainWidth := m.width - logWidth
 	if mainWidth < 0 {
@@ -93,7 +120,24 @@ func (m *model) View() string {
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, main, logView)
 	status := statusStyle.Render(m.mode.Status(m))
-	return lipgloss.JoinVertical(lipgloss.Left, info, content, status)
+	message := messageStyle.Render(m.message)
+	return lipgloss.JoinVertical(lipgloss.Left, info, content, status, message)
+}
+
+func (m *model) hasIngredients(d dish.Dish) bool {
+	for _, need := range d.Ingredients {
+		found := false
+		for _, have := range m.ingredients {
+			if have == need {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func eventString(e game.Event) string {
@@ -131,7 +175,10 @@ type draftMode struct {
 	cursor int
 }
 
-func (d *draftMode) Init(m *model) tea.Cmd { return nil }
+func (d *draftMode) Init(m *model) tea.Cmd {
+	m.message = ""
+	return nil
+}
 
 func (d *draftMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -190,7 +237,6 @@ type designMode struct {
 	cursor    int
 	selected  map[int]bool
 	name      textinput.Model
-	message   string
 	dishes    []string
 	selecting bool
 	confirm   bool
@@ -204,6 +250,7 @@ func (d *designMode) Init(m *model) tea.Cmd {
 	d.dishes = []string{}
 	d.selecting = true
 	d.confirm = false
+	m.message = ""
 	return nil
 }
 
@@ -215,7 +262,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	switch msg := msg.(type) {
 	case game.DishCreatedEvent:
 		d.dishes = append(d.dishes, msg.Dish.Name)
-		d.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
+		m.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
 		d.confirm = false
@@ -224,6 +271,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.String() != "enter" {
 			d.confirm = false
+			m.message = ""
 		}
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -247,10 +295,11 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 			} else {
 				if !d.confirm {
 					d.confirm = true
+					m.message = "press enter again to confirm"
 				} else {
 					name := strings.TrimSpace(d.name.Value())
 					if len(d.dishes) >= 2 {
-						d.message = "Maximum of 2 dishes reached"
+						m.message = "Maximum of 2 dishes reached"
 						break
 					}
 					if name != "" && len(d.selected) > 0 {
@@ -263,10 +312,12 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 						m.actions <- game.CreateDishAction{Name: name, Indices: indices}
 					}
 					d.confirm = false
+					m.message = ""
 				}
 			}
 		case "tab":
 			d.confirm = false
+			m.message = ""
 			if d.selecting {
 				d.selecting = false
 				d.name.Focus()
@@ -274,9 +325,12 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 				d.selecting = true
 				d.name.Blur()
 			}
-		case "f":
-			m.actions <- game.FinishDesignAction{}
-			return nil, nil
+		case "f", "F":
+			if d.selecting {
+				m.message = ""
+				m.actions <- game.FinishDesignAction{}
+				return nil, nil
+			}
 		}
 	}
 	return nil, cmd
@@ -307,9 +361,6 @@ func (d *designMode) View(m *model) string {
 		}
 	}
 	b.WriteString("\n" + d.name.View() + "\n")
-	if d.message != "" {
-		b.WriteString(d.message + "\n")
-	}
 	return paneStyle.Render(b.String())
 }
 
@@ -323,7 +374,10 @@ type serviceMode struct {
 	finished bool
 }
 
-func (s *serviceMode) Init(m *model) tea.Cmd { return nil }
+func (s *serviceMode) Init(m *model) tea.Cmd {
+	m.message = ""
+	return nil
+}
 
 func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -379,7 +433,9 @@ var (
 	titleStyle    = lipgloss.NewStyle().Bold(true)
 	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
+	missingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
 	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
+	messageStyle  = lipgloss.NewStyle().Padding(0, 1)
 	logStyle      = paneStyle.Copy().Width(logWidth)
 )
 

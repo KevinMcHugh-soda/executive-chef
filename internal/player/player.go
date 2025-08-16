@@ -32,8 +32,7 @@ func (p *Player) AddMoney(amount int) {
 	p.Money += amount
 }
 
-// ResetTurn clears drafted ingredients and dishes for a new turn.
+// ResetTurn clears drafted ingredients for a new turn while keeping dishes.
 func (p *Player) ResetTurn() {
 	p.Drafted = nil
-	p.Dishes = nil
 }
