@@ -45,7 +45,7 @@ func (t *Turn) DesignPhase() {
 		act := <-t.Actions
 		switch a := act.(type) {
 		case CreateDishAction:
-			if a.Name == "" {
+			if len(t.Player.Dishes) >= 2 || a.Name == "" {
 				continue
 			}
 			used := make(map[int]bool)
