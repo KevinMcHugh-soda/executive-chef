@@ -33,6 +33,9 @@ func (t *Turn) DraftPhase() {
 		return reveal[i].Name < reveal[j].Name
 	})
 	remaining := 3
+	if t.Number > 1 {
+		remaining = 5
+	}
 	t.Game.Events <- DraftOptionsEvent{Reveal: reveal, Picks: remaining}
 	for remaining > 0 && len(reveal) > 0 {
 		act := <-t.Game.Actions
