@@ -55,7 +55,8 @@ func (t *Turn) DraftPhase() {
 
 // DesignPhase allows the player to combine drafted ingredients into named dishes.
 // The player can create up to two dishes this turn and may have up to ten dishes
-// overall. The phase ends when a FinishDesignAction is received.
+// overall. Each dish may contain at most three ingredients. The phase ends when
+// a FinishDesignAction is received.
 func (t *Turn) DesignPhase() {
 	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDesign}
 	t.Game.Events <- DesignOptionsEvent{Drafted: t.Game.Player.Drafted}
@@ -65,7 +66,7 @@ func (t *Turn) DesignPhase() {
 		act := <-t.Game.Actions
 		switch a := act.(type) {
 		case CreateDishAction:
-			if a.Name == "" || len(created) >= 2 || len(t.Game.Player.Dishes) >= 10 {
+			if a.Name == "" || len(created) >= 2 || len(t.Game.Player.Dishes) >= 10 || len(a.Indices) > dish.MaxIngredients {
 				continue
 			}
 			used := make(map[int]bool)
@@ -79,7 +80,7 @@ func (t *Turn) DesignPhase() {
 				used[idx] = true
 				dishIngs = append(dishIngs, t.Game.Player.Drafted[idx])
 			}
-			if !valid || len(dishIngs) == 0 {
+			if !valid || len(dishIngs) == 0 || len(dishIngs) > dish.MaxIngredients {
 				continue
 			}
 			d := dish.Dish{Name: a.Name, Ingredients: dishIngs}

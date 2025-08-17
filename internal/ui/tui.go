@@ -370,8 +370,10 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 			if d.focus == focusIngredients {
 				if d.selected[d.cursor] {
 					delete(d.selected, d.cursor)
-				} else {
+				} else if len(d.selected) < dish.MaxIngredients {
 					d.selected[d.cursor] = true
+				} else {
+					m.message = fmt.Sprintf("each dish can have up to %d ingredients", dish.MaxIngredients)
 				}
 				if d.autoName {
 					d.name.SetValue(defaultDishName(d.selected, d.drafted))
