@@ -18,7 +18,7 @@ type Turn struct {
 // the player may draft three of them in the first turn and five thereafter.
 func (t *Turn) DraftPhase() {
 	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDraft}
-	reveal := t.Deck.Draw(10)
+	reveal := t.Game.Deck.Draw(10)
 	roleOrder := map[ingredient.Role]int{
 		ingredient.Protein:   0,
 		ingredient.Vegetable: 1,

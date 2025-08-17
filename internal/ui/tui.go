@@ -257,6 +257,7 @@ type designMode struct {
 	dishes    []string
 	selecting bool
 	confirm   bool
+	autoName  bool
 }
 
 func (d *designMode) Init(m *model) tea.Cmd {
@@ -267,6 +268,7 @@ func (d *designMode) Init(m *model) tea.Cmd {
 	d.dishes = []string{}
 	d.selecting = true
 	d.confirm = false
+	d.autoName = true
 	m.message = ""
 	return nil
 }
@@ -274,6 +276,9 @@ func (d *designMode) Init(m *model) tea.Cmd {
 func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	var cmd tea.Cmd
 	if !d.selecting {
+		if km, ok := msg.(tea.KeyMsg); ok && km.String() != "tab" && km.String() != "enter" {
+			d.autoName = false
+		}
 		d.name, cmd = d.name.Update(msg)
 	}
 	switch msg := msg.(type) {
@@ -283,6 +288,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
 		d.confirm = false
+		d.autoName = true
 	case game.DishDeletedEvent:
 		if len(d.dishes) > 0 {
 			m.message = fmt.Sprintf("Deleted dish '%s'", d.dishes[len(d.dishes)-1])
@@ -315,6 +321,9 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 				} else {
 					d.selected[d.cursor] = true
 				}
+				if d.autoName {
+					d.name.SetValue(defaultDishName(d.selected, d.drafted))
+				}
 			} else {
 				if len(m.dishes) >= 10 || len(d.dishes) >= 2 {
 					if !d.confirm {
@@ -339,18 +348,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 							}
 						}
 						if name == "" {
-							var firstTwo []string
-							for _, idx := range indices {
-								firstTwo = append(firstTwo, d.drafted[idx].Name)
-								if len(firstTwo) == 2 {
-									break
-								}
-							}
-							if len(firstTwo) >= 2 {
-								name = firstTwo[0] + " and " + firstTwo[1]
-							} else if len(firstTwo) == 1 {
-								name = firstTwo[0]
-							}
+							name = defaultDishName(d.selected, d.drafted)
 						}
 						m.actions <- game.CreateDishAction{Name: name, Indices: indices}
 						m.message = ""
@@ -413,6 +411,25 @@ func (d *designMode) View(m *model) string {
 
 func (d *designMode) Status(m *model) string {
 	return "up/down: move • enter: select • tab: name • enter x2: create dish • ctrl+d: delete • f: finish • q: quit"
+}
+
+func defaultDishName(selected map[int]bool, drafted []ingredient.Ingredient) string {
+	var names []string
+	for i := range drafted {
+		if selected[i] {
+			names = append(names, drafted[i].Name)
+			if len(names) == 2 {
+				break
+			}
+		}
+	}
+	switch len(names) {
+	case 2:
+		return names[0] + " and " + names[1]
+	case 1:
+		return names[0]
+	}
+	return ""
 }
 
 // ---- Service Mode ----
