@@ -464,7 +464,11 @@ func (s *serviceMode) View(m *model) string {
 				craving = append(craving, name)
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s: %s -> ", s.current.Customer.Name, strings.Join(craving, ", ")))
+		var constraint string
+		if s.current.Customer.Constraint != nil {
+			constraint = fmt.Sprintf(" (no %s)", s.current.Customer.Constraint.Name)
+		}
+		b.WriteString(fmt.Sprintf("%s: %s%s -> ", s.current.Customer.Name, strings.Join(craving, ", "), constraint))
 		if s.current.Dish != nil {
 			b.WriteString(servedStyle.Render(s.current.Dish.Name))
 		} else {

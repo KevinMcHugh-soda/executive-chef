@@ -113,6 +113,18 @@ func (t *Turn) ServicePhase() {
 		bestScore := 0
 		bestCraving := -1
 		for i, d := range available {
+			if c.Constraint != nil {
+				rejected := false
+				for _, ing := range d.Ingredients {
+					if ing == *c.Constraint {
+						rejected = true
+						break
+					}
+				}
+				if rejected {
+					continue
+				}
+			}
 			score := 0
 			cravingIdx := -1
 			for j, cr := range c.Cravings {

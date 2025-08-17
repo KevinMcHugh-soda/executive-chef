@@ -16,8 +16,9 @@ type Craving struct {
 
 // Customer represents a single customer with ordered cravings and a name.
 type Customer struct {
-	Name     string
-	Cravings []Craving
+	Name       string
+	Cravings   []Craving
+	Constraint *ingredient.Ingredient // ingredient the customer refuses, nil if none
 }
 
 // RandomCraving returns a Craving made of random ingredients.
@@ -57,7 +58,29 @@ func RandomCustomer(ingredients []ingredient.Ingredient, numCravings int) Custom
 	for i := 0; i < numCravings; i++ {
 		cravings[i] = RandomCraving(ingredients)
 	}
-	return Customer{Name: gofakeit.Name(), Cravings: cravings}
+
+	// Choose a constraint from ingredients not already in cravings with 50% chance.
+	var constraint *ingredient.Ingredient
+	if len(ingredients) > 0 {
+		used := make(map[ingredient.Ingredient]bool)
+		for _, cr := range cravings {
+			for _, ing := range cr.Ingredients {
+				used[ing] = true
+			}
+		}
+		var candidates []ingredient.Ingredient
+		for _, ing := range ingredients {
+			if !used[ing] {
+				candidates = append(candidates, ing)
+			}
+		}
+		if len(candidates) > 0 && rand.Intn(2) == 0 {
+			c := candidates[rand.Intn(len(candidates))]
+			constraint = &c
+		}
+	}
+
+	return Customer{Name: gofakeit.Name(), Cravings: cravings, Constraint: constraint}
 }
 
 // RandomCustomers generates the specified number of customers.
