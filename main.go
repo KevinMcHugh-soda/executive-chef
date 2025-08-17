@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"executive-chef/internal/customer"
 	"executive-chef/internal/deck"
 	"executive-chef/internal/game"
 	"executive-chef/internal/ingredient"
@@ -17,12 +18,13 @@ func main() {
 	}
 
 	d := deck.New(ingredients)
+	c := customer.NewDeck(ingredients)
 	p := player.New()
 
 	events := make(chan game.Event)
 	actions := make(chan game.Action)
 
-	g := game.New(ingredients, d, p, events, actions)
+	g := game.New(d, c, p, events, actions)
 
 	go g.Play()
 

@@ -3,7 +3,6 @@ package game
 import (
 	"sort"
 
-	"executive-chef/internal/customer"
 	"executive-chef/internal/dish"
 	"executive-chef/internal/ingredient"
 )
@@ -101,7 +100,7 @@ func (t *Turn) DesignPhase() {
 // ServicePhase presents dishes to customers who choose based on their cravings.
 func (t *Turn) ServicePhase() {
 	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseService}
-	customers := customer.RandomCustomers(t.Game.AllIngredients, 3)
+	customers := t.Game.Customers.Draw(3)
 	var available []dish.Dish
 	for _, d := range t.Game.Player.Dishes {
 		if hasIngredients(t.Game.Player.Drafted, d.Ingredients) {
