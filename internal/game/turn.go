@@ -57,6 +57,7 @@ func (t *Turn) DraftPhase() {
 func (t *Turn) DesignPhase() {
 	t.Game.Events <- PhaseEvent{Turn: t.Number, Phase: PhaseDesign}
 	t.Game.Events <- DesignOptionsEvent{Drafted: t.Game.Player.Drafted}
+	existing := len(t.Game.Player.Dishes)
 	created := 0
 
 	for {
@@ -85,11 +86,13 @@ func (t *Turn) DesignPhase() {
 			created++
 			t.Game.Events <- DishCreatedEvent{Dish: d}
 		case DeleteDishAction:
-			if created > 0 {
-				d, ok := t.Game.Player.RemoveLastDish()
+			if a.Index >= 0 && a.Index < len(t.Game.Player.Dishes) {
+				d, ok := t.Game.Player.RemoveDish(a.Index)
 				if ok {
-					created--
-					t.Game.Events <- DishDeletedEvent{Dish: d}
+					if a.Index >= existing && created > 0 {
+						created--
+					}
+					t.Game.Events <- DishDeletedEvent{Dish: d, Index: a.Index}
 				}
 			}
 		case FinishDesignAction:

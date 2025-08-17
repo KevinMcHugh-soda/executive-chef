@@ -66,8 +66,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case game.DishCreatedEvent:
 			m.dishes = append(m.dishes, ev.Dish)
 		case game.DishDeletedEvent:
-			if len(m.dishes) > 0 {
-				m.dishes = m.dishes[:len(m.dishes)-1]
+			if ev.Index >= 0 && ev.Index < len(m.dishes) {
+				m.dishes = append(m.dishes[:ev.Index], m.dishes[ev.Index+1:]...)
 			}
 		case game.ServiceEndEvent:
 			m.ingredients = nil
@@ -257,14 +257,24 @@ func (d *draftMode) Status(m *model) string {
 }
 
 // ---- Design Mode ----
+type designFocus int
+
+const (
+	focusIngredients designFocus = iota
+	focusName
+	focusDish
+)
+
 type designMode struct {
-	drafted   []ingredient.Ingredient
-	cursor    int
-	selected  map[int]bool
-	name      textinput.Model
-	dishes    []string
-	selecting bool
-	confirm   bool
+	drafted    []ingredient.Ingredient
+	cursor     int
+	selected   map[int]bool
+	name       textinput.Model
+	dishes     []string
+	dishIdx    []int
+	dishCursor int
+	focus      designFocus
+	confirm    bool
 }
 
 func (d *designMode) Init(m *model) tea.Cmd {
@@ -273,7 +283,9 @@ func (d *designMode) Init(m *model) tea.Cmd {
 	d.name.Placeholder = "Dish name"
 	d.name.Blur()
 	d.dishes = []string{}
-	d.selecting = true
+	d.dishIdx = []int{}
+	d.dishCursor = 0
+	d.focus = focusIngredients
 	d.confirm = false
 	m.message = ""
 	return nil
@@ -281,49 +293,67 @@ func (d *designMode) Init(m *model) tea.Cmd {
 
 func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	var cmd tea.Cmd
-	if !d.selecting {
+	if d.focus == focusName {
 		d.name, cmd = d.name.Update(msg)
 	}
 	switch msg := msg.(type) {
 	case game.DishCreatedEvent:
 		d.dishes = append(d.dishes, msg.Dish.Name)
+		d.dishIdx = append(d.dishIdx, len(m.dishes)-1)
 		m.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
 		d.confirm = false
 	case game.DishDeletedEvent:
-		if len(d.dishes) > 0 {
-			m.message = fmt.Sprintf("Deleted dish '%s'", d.dishes[len(d.dishes)-1])
-			d.dishes = d.dishes[:len(d.dishes)-1]
+		for i, idx := range d.dishIdx {
+			if idx == msg.Index {
+				m.message = fmt.Sprintf("Deleted dish '%s'", d.dishes[i])
+				d.dishes = append(d.dishes[:i], d.dishes[i+1:]...)
+				d.dishIdx = append(d.dishIdx[:i], d.dishIdx[i+1:]...)
+				if d.dishCursor >= len(d.dishes) && d.dishCursor > 0 {
+					d.dishCursor--
+				}
+				break
+			}
+		}
+		for i := range d.dishIdx {
+			if d.dishIdx[i] > msg.Index {
+				d.dishIdx[i]--
+			}
 		}
 		d.confirm = false
 	case game.ServiceResultEvent:
 		return &serviceMode{current: &msg}, nil
 	case tea.KeyMsg:
-		if msg.String() != "enter" {
+		key := msg.String()
+		if !((d.focus == focusName && key == "enter") || (d.focus == focusDish && (key == "d" || key == "D"))) {
 			d.confirm = false
 			m.message = ""
 		}
-		switch msg.String() {
+		switch key {
 		case "ctrl+c", "q":
 			m.actions <- game.FinishDesignAction{}
 			return nil, tea.Quit
 		case "up", "k":
-			if d.selecting && d.cursor > 0 {
+			if d.focus == focusIngredients && d.cursor > 0 {
 				d.cursor--
+			} else if d.focus == focusDish && d.dishCursor > 0 {
+				d.dishCursor--
 			}
 		case "down", "j":
-			if d.selecting && d.cursor < len(d.drafted)-1 {
+			if d.focus == focusIngredients && d.cursor < len(d.drafted)-1 {
 				d.cursor++
+			} else if d.focus == focusDish && d.dishCursor < len(d.dishes)-1 {
+				d.dishCursor++
 			}
 		case "enter":
-			if d.selecting {
+			if d.focus == focusIngredients {
 				if d.selected[d.cursor] {
 					delete(d.selected, d.cursor)
 				} else {
 					d.selected[d.cursor] = true
 				}
-			} else {
+			} else if d.focus == focusName {
 				if len(m.dishes) >= 10 || len(d.dishes) >= 2 {
 					if !d.confirm {
 						d.confirm = true
@@ -366,22 +396,35 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					d.confirm = false
 				}
 			}
-		case "ctrl+d":
-			if len(d.dishes) > 0 {
-				m.actions <- game.DeleteDishAction{}
+		case "d", "D":
+			if d.focus == focusDish && len(d.dishes) > 0 {
+				if !d.confirm {
+					d.confirm = true
+					m.message = fmt.Sprintf("press D again to delete '%s'", d.dishes[d.dishCursor])
+				} else {
+					idx := d.dishIdx[d.dishCursor]
+					m.actions <- game.DeleteDishAction{Index: idx}
+					d.confirm = false
+				}
 			}
 		case "tab":
 			d.confirm = false
 			m.message = ""
-			if d.selecting {
-				d.selecting = false
+			switch d.focus {
+			case focusIngredients:
+				d.focus = focusName
 				d.name.Focus()
-			} else {
-				d.selecting = true
+			case focusName:
 				d.name.Blur()
+				d.focus = focusDish
+				if d.dishCursor >= len(d.dishes) && len(d.dishes) > 0 {
+					d.dishCursor = len(d.dishes) - 1
+				}
+			case focusDish:
+				d.focus = focusIngredients
 			}
 		case "f", "F":
-			if d.selecting {
+			if d.focus == focusIngredients {
 				m.message = ""
 				m.actions <- game.FinishDesignAction{}
 				return nil, nil
@@ -404,15 +447,23 @@ func (d *designMode) View(m *model) string {
 			mark = "*"
 		}
 		line := fmt.Sprintf("%s%s %s (%s)", cursor, mark, ing.Name, ing.Role)
-		if d.cursor == i || d.selected[i] {
+		if (d.focus == focusIngredients && d.cursor == i) || d.selected[i] {
 			line = selectedStyle.Render(line)
 		}
 		b.WriteString(line + "\n")
 	}
 	if len(d.dishes) > 0 {
 		b.WriteString("\nDishes:\n")
-		for _, name := range d.dishes {
-			b.WriteString("- " + name + "\n")
+		for i, name := range d.dishes {
+			cursor := " "
+			if d.focus == focusDish && d.dishCursor == i {
+				cursor = ">"
+			}
+			line := fmt.Sprintf("%s- %s", cursor, name)
+			if d.focus == focusDish && d.dishCursor == i {
+				line = selectedStyle.Render(line)
+			}
+			b.WriteString(line + "\n")
 		}
 	}
 	b.WriteString("\n" + d.name.View() + "\n")
@@ -420,7 +471,7 @@ func (d *designMode) View(m *model) string {
 }
 
 func (d *designMode) Status(m *model) string {
-	return "up/down: move • enter: select • tab: name • enter x2: create dish • ctrl+d: delete • f: finish • q: quit"
+	return "up/down: move • enter: select • tab: next • enter x2: create dish • D x2: delete dish • f: finish • q: quit"
 }
 
 // ---- Service Mode ----

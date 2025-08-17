@@ -38,6 +38,17 @@ func (p *Player) RemoveLastDish() (dish.Dish, bool) {
 	return d, true
 }
 
+// RemoveDish removes and returns the dish at the given index.
+// The second return value is false if the index is out of range.
+func (p *Player) RemoveDish(i int) (dish.Dish, bool) {
+	if i < 0 || i >= len(p.Dishes) {
+		return dish.Dish{}, false
+	}
+	d := p.Dishes[i]
+	p.Dishes = append(p.Dishes[:i], p.Dishes[i+1:]...)
+	return d, true
+}
+
 // AddMoney increases the player's money by the given amount.
 func (p *Player) AddMoney(amount int) {
 	p.Money += amount
