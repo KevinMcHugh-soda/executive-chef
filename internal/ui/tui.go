@@ -452,7 +452,16 @@ func (s *serviceMode) View(m *model) string {
 		var craving []string
 		if len(s.current.Customer.Cravings) > 0 {
 			for _, ing := range s.current.Customer.Cravings[0].Ingredients {
-				craving = append(craving, ing.Name)
+				name := ing.Name
+				if s.current.Dish != nil {
+					for _, ding := range s.current.Dish.Ingredients {
+						if ding == ing {
+							name = servedStyle.Render(name)
+							break
+						}
+					}
+				}
+				craving = append(craving, name)
 			}
 		}
 		b.WriteString(fmt.Sprintf("%s: %s -> ", s.current.Customer.Name, strings.Join(craving, ", ")))
