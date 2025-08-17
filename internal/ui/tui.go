@@ -188,8 +188,9 @@ func eventString(e game.Event) string {
 
 // ---- Draft Mode ----
 type draftMode struct {
-	draft  []ingredient.Ingredient
-	cursor int
+	draft     []ingredient.Ingredient
+	cursor    int
+	remaining int
 }
 
 func (d *draftMode) Init(m *model) tea.Cmd {
@@ -201,6 +202,7 @@ func (d *draftMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	switch msg := msg.(type) {
 	case game.DraftOptionsEvent:
 		d.draft = msg.Reveal
+		d.remaining = msg.Picks
 		if d.cursor >= len(d.draft) {
 			d.cursor = len(d.draft) - 1
 		}
@@ -221,6 +223,9 @@ func (d *draftMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 		case "enter", " ":
 			if len(d.draft) > 0 {
 				m.actions <- game.DraftSelectionAction{Index: d.cursor}
+				if d.remaining > 0 {
+					d.remaining--
+				}
 			}
 		}
 	}
@@ -245,7 +250,10 @@ func (d *draftMode) View(m *model) string {
 }
 
 func (d *draftMode) Status(m *model) string {
-	return "up/down: move • enter/space: draft • q: quit"
+	return fmt.Sprintf(
+		"Pick %d more ingredients • up/down: move • enter/space: draft • q: quit",
+		d.remaining,
+	)
 }
 
 // ---- Design Mode ----
