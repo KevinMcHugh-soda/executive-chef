@@ -163,7 +163,7 @@ func (t *Turn) ServicePhase() {
 		}
 		var chosen *dish.Dish
 		payment := 0
-		if bestIdx >= 0 {
+		if bestIdx >= 0 && bestScore > 0 {
 			d := available[bestIdx]
 			chosen = &d
 			switch bestCraving {
