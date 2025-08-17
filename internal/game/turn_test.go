@@ -2,10 +2,13 @@ package game
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"executive-chef/internal/customer"
 	"executive-chef/internal/deck"
+	"executive-chef/internal/dish"
 	"executive-chef/internal/ingredient"
 	"executive-chef/internal/player"
 )
@@ -42,8 +45,42 @@ func TestDraftPhaseAllowsFivePicksAfterFirstTurn(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		actions <- DraftSelectionAction{Index: 0}
 	}
-	g := New(nil, d, p, events, actions)
+	g := New(d, nil, p, events, actions)
 	turn := Turn{Number: 2, Game: g}
 	turn.DraftPhase()
 	assert.Len(t, p.Drafted, 5)
+}
+
+func TestServicePhaseWaitsForFinalContinue(t *testing.T) {
+	ing := ingredient.Ingredient{Name: "Chicken", Role: ingredient.Protein}
+	cust := customer.Customer{
+		Name:     "Patron",
+		Cravings: []customer.Craving{{Ingredients: []ingredient.Ingredient{ing}}},
+	}
+	cdeck := &customer.Deck{Cards: []customer.Customer{cust}}
+	p := player.New()
+	p.Drafted = []ingredient.Ingredient{ing}
+	p.Dishes = []dish.Dish{{Name: "Dish", Ingredients: []ingredient.Ingredient{ing}}}
+	events := make(chan Event, 10)
+	actions := make(chan Action, 1)
+	g := New(nil, cdeck, p, events, actions)
+	turn := Turn{Number: 1, Game: g}
+
+	go turn.ServicePhase()
+
+	<-events // PhaseEvent
+	if _, ok := (<-events).(ServiceResultEvent); !ok {
+		t.Fatal("expected service result event")
+	}
+
+	select {
+	case e := <-events:
+		t.Fatalf("unexpected event before continue: %T", e)
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	actions <- ContinueAction{}
+	if _, ok := (<-events).(ServiceEndEvent); !ok {
+		t.Fatal("expected service end event")
+	}
 }
