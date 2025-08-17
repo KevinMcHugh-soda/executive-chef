@@ -66,8 +66,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case game.DishCreatedEvent:
 			m.dishes = append(m.dishes, ev.Dish)
 		case game.DishDeletedEvent:
-			if len(m.dishes) > 0 {
-				m.dishes = m.dishes[:len(m.dishes)-1]
+			if ev.Index >= 0 && ev.Index < len(m.dishes) {
+				m.dishes = append(m.dishes[:ev.Index], m.dishes[ev.Index+1:]...)
 			}
 		case game.ServiceEndEvent:
 			m.ingredients = nil
@@ -268,15 +268,30 @@ func (d *draftMode) Status(m *model) string {
 }
 
 // ---- Design Mode ----
+type designFocus int
+
+const (
+	focusIngredients designFocus = iota
+	focusName
+	focusDishes
+)
+
+type createdDish struct {
+	name  string
+	index int
+}
+
 type designMode struct {
-	drafted   []ingredient.Ingredient
-	cursor    int
-	selected  map[int]bool
-	name      textinput.Model
-	dishes    []string
-	selecting bool
-	confirm   bool
-	autoName  bool
+	drafted       []ingredient.Ingredient
+	cursor        int
+	selected      map[int]bool
+	name          textinput.Model
+	dishes        []createdDish
+	focus         designFocus
+	confirm       bool
+	deleteConfirm bool
+	autoName      bool
+	dishCursor    int
 }
 
 func (d *designMode) Init(m *model) tea.Cmd {
@@ -284,17 +299,19 @@ func (d *designMode) Init(m *model) tea.Cmd {
 	d.name = textinput.New()
 	d.name.Placeholder = "Dish name"
 	d.name.Blur()
-	d.dishes = []string{}
-	d.selecting = true
+	d.dishes = []createdDish{}
+	d.focus = focusIngredients
 	d.confirm = false
+	d.deleteConfirm = false
 	d.autoName = true
+	d.dishCursor = 0
 	m.message = ""
 	return nil
 }
 
 func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	var cmd tea.Cmd
-	if !d.selecting {
+	if d.focus == focusName {
 		if km, ok := msg.(tea.KeyMsg); ok && km.String() != "tab" && km.String() != "enter" {
 			d.autoName = false
 		}
@@ -302,23 +319,35 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case game.DishCreatedEvent:
-		d.dishes = append(d.dishes, msg.Dish.Name)
+		d.dishes = append(d.dishes, createdDish{name: msg.Dish.Name, index: len(m.dishes) - 1})
 		m.message = fmt.Sprintf("Added dish '%s'!", msg.Dish.Name)
 		d.name.SetValue("")
 		d.selected = make(map[int]bool)
 		d.confirm = false
 		d.autoName = true
 	case game.DishDeletedEvent:
-		if len(d.dishes) > 0 {
-			m.message = fmt.Sprintf("Deleted dish '%s'", d.dishes[len(d.dishes)-1])
-			d.dishes = d.dishes[:len(d.dishes)-1]
+		m.message = fmt.Sprintf("Deleted dish '%s'", msg.Dish.Name)
+		for i, dd := range d.dishes {
+			if dd.index == msg.Index {
+				d.dishes = append(d.dishes[:i], d.dishes[i+1:]...)
+				if d.dishCursor >= len(d.dishes) && d.dishCursor > 0 {
+					d.dishCursor--
+				}
+				break
+			}
 		}
 		d.confirm = false
+		d.deleteConfirm = false
 	case game.ServiceResultEvent:
 		return &serviceMode{current: &msg}, nil
 	case tea.KeyMsg:
 		if msg.String() != "enter" {
 			d.confirm = false
+		}
+		if strings.ToLower(msg.String()) != "d" {
+			d.deleteConfirm = false
+		}
+		if msg.String() != "enter" && strings.ToLower(msg.String()) != "d" {
 			m.message = ""
 		}
 		switch msg.String() {
@@ -326,15 +355,19 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 			m.actions <- game.FinishDesignAction{}
 			return nil, tea.Quit
 		case "up", "k":
-			if d.selecting && d.cursor > 0 {
+			if d.focus == focusIngredients && d.cursor > 0 {
 				d.cursor--
+			} else if d.focus == focusDishes && d.dishCursor > 0 {
+				d.dishCursor--
 			}
 		case "down", "j":
-			if d.selecting && d.cursor < len(d.drafted)-1 {
+			if d.focus == focusIngredients && d.cursor < len(d.drafted)-1 {
 				d.cursor++
+			} else if d.focus == focusDishes && d.dishCursor < len(d.dishes)-1 {
+				d.dishCursor++
 			}
 		case "enter":
-			if d.selecting {
+			if d.focus == focusIngredients {
 				if d.selected[d.cursor] {
 					delete(d.selected, d.cursor)
 				} else {
@@ -343,7 +376,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 				if d.autoName {
 					d.name.SetValue(defaultDishName(d.selected, d.drafted))
 				}
-			} else {
+			} else if d.focus == focusName {
 				if len(m.dishes) >= 10 || len(d.dishes) >= 2 {
 					if !d.confirm {
 						d.confirm = true
@@ -375,22 +408,30 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					d.confirm = false
 				}
 			}
-		case "ctrl+d":
-			if len(d.dishes) > 0 {
-				m.actions <- game.DeleteDishAction{}
+		case "d", "D":
+			if d.focus == focusDishes && len(d.dishes) > 0 {
+				if !d.deleteConfirm {
+					d.deleteConfirm = true
+					m.message = fmt.Sprintf("press d again to delete '%s'", d.dishes[d.dishCursor].name)
+				} else {
+					idx := d.dishes[d.dishCursor].index
+					m.actions <- game.DeleteDishAction{Index: idx}
+					m.message = ""
+					d.deleteConfirm = false
+				}
 			}
 		case "tab":
 			d.confirm = false
+			d.deleteConfirm = false
 			m.message = ""
-			if d.selecting {
-				d.selecting = false
+			d.focus = (d.focus + 1) % 3
+			if d.focus == focusName {
 				d.name.Focus()
 			} else {
-				d.selecting = true
 				d.name.Blur()
 			}
 		case "f", "F":
-			if d.selecting {
+			if d.focus == focusIngredients {
 				m.message = ""
 				m.actions <- game.FinishDesignAction{}
 				return nil, nil
@@ -405,7 +446,7 @@ func (d *designMode) View(m *model) string {
 	b.WriteString(titleStyle.Render("Design Dishes") + "\n")
 	for i, ing := range d.drafted {
 		cursor := " "
-		if d.cursor == i {
+		if d.cursor == i && d.focus == focusIngredients {
 			cursor = ">"
 		}
 		mark := " "
@@ -413,15 +454,21 @@ func (d *designMode) View(m *model) string {
 			mark = "*"
 		}
 		line := fmt.Sprintf("%s%s %s (%s)", cursor, mark, ing.Name, ing.Role)
-		if d.cursor == i || d.selected[i] {
+		if (d.cursor == i && d.focus == focusIngredients) || d.selected[i] {
 			line = selectedStyle.Render(line)
 		}
 		b.WriteString(line + "\n")
 	}
 	if len(d.dishes) > 0 {
 		b.WriteString("\nDishes:\n")
-		for _, name := range d.dishes {
-			b.WriteString("- " + name + "\n")
+		for i, dd := range d.dishes {
+			cursor := " "
+			line := dd.name
+			if d.focus == focusDishes && d.dishCursor == i {
+				cursor = ">"
+				line = selectedStyle.Render(line)
+			}
+			b.WriteString(fmt.Sprintf("%s %s\n", cursor, line))
 		}
 	}
 	b.WriteString("\n" + d.name.View() + "\n")
@@ -429,7 +476,7 @@ func (d *designMode) View(m *model) string {
 }
 
 func (d *designMode) Status(m *model) string {
-	return "up/down: move • enter: select • tab: name • enter x2: create dish • ctrl+d: delete • f: finish • q: quit"
+	return "up/down: move • enter: select • tab: cycle ingredients/name/dish • enter x2: create dish • d x2: delete dish • f: finish • q: quit"
 }
 
 func defaultDishName(selected map[int]bool, drafted []ingredient.Ingredient) string {

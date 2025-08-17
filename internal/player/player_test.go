@@ -26,6 +26,15 @@ func TestPlayerLifecycle(t *testing.T) {
 	p.AddDish(d)
 	assert.Equal(t, []dish.Dish{d}, p.Dishes)
 
+	d2 := dish.Dish{Name: "Veggie Dish", Ingredients: []ingredient.Ingredient{ing}}
+	p.AddDish(d2)
+	removed, ok := p.RemoveDish(0)
+	assert.True(t, ok)
+	assert.Equal(t, d, removed)
+	assert.Equal(t, []dish.Dish{d2}, p.Dishes)
+	_, ok = p.RemoveDish(5)
+	assert.False(t, ok)
+
 	p.AddMoney(5)
 	assert.Equal(t, 5, p.Money)
 

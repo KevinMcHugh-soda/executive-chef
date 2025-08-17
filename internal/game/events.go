@@ -58,8 +58,10 @@ type DishCreatedEvent struct {
 func (e DishCreatedEvent) EventType() string { return "dish_created" }
 
 // DishDeletedEvent notifies the UI that a dish has been deleted.
+// Index refers to the position of the dish in the player's dish list.
 type DishDeletedEvent struct {
-	Dish dish.Dish
+	Dish  dish.Dish
+	Index int
 }
 
 func (e DishDeletedEvent) EventType() string { return "dish_deleted" }
@@ -100,8 +102,8 @@ type CreateDishAction struct {
 
 func (a CreateDishAction) ActionType() string { return "create_dish" }
 
-// DeleteDishAction removes the most recently created dish.
-type DeleteDishAction struct{}
+// DeleteDishAction removes a dish at the given index.
+type DeleteDishAction struct{ Index int }
 
 func (a DeleteDishAction) ActionType() string { return "delete_dish" }
 
