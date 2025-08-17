@@ -186,12 +186,14 @@ func (t *Turn) ServicePhase() {
 			}
 		}
 	}
-	t.Game.Events <- ServiceEndEvent{}
-	for {
-		if _, ok := (<-t.Game.Actions).(ContinueAction); ok {
-			break
+	if len(customers) > 0 {
+		for {
+			if _, ok := (<-t.Game.Actions).(ContinueAction); ok {
+				break
+			}
 		}
 	}
+	t.Game.Events <- ServiceEndEvent{}
 }
 
 func hasIngredients(have []ingredient.Ingredient, needed []ingredient.Ingredient) bool {
