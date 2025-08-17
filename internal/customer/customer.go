@@ -23,7 +23,8 @@ type Customer struct {
 
 // RandomCraving returns a Craving made of random ingredients.
 // Each ingredient in the resulting craving will be unique even if the
-// provided slice contains duplicates.
+// provided slice contains duplicates, and no craving will contain more than
+// three ingredients.
 func RandomCraving(ingredients []ingredient.Ingredient) Craving {
 	if len(ingredients) == 0 {
 		return Craving{}
@@ -39,7 +40,11 @@ func RandomCraving(ingredients []ingredient.Ingredient) Craving {
 		}
 	}
 
-	n := rand.Intn(len(unique)) + 1
+	limit := len(unique)
+	if limit > 3 {
+		limit = 3
+	}
+	n := rand.Intn(limit) + 1
 	idxs := rand.Perm(len(unique))[:n]
 	combo := make([]ingredient.Ingredient, 0, n)
 	for _, i := range idxs {

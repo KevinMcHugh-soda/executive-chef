@@ -32,3 +32,17 @@ func TestRandomCravingUniqueness(t *testing.T) {
 		seen[ing] = true
 	}
 }
+
+func TestRandomCravingMaxSize(t *testing.T) {
+	rand.Seed(2)
+	ingredients := []ingredient.Ingredient{
+		{Name: "Chicken", Role: ingredient.Protein},
+		{Name: "Beef", Role: ingredient.Protein},
+		{Name: "Rice", Role: ingredient.Carb},
+		{Name: "Pasta", Role: ingredient.Carb},
+		{Name: "Lettuce", Role: ingredient.Vegetable},
+	}
+	cr := customer.RandomCraving(ingredients)
+	require.NotEmpty(t, cr.Ingredients)
+	assert.LessOrEqual(t, len(cr.Ingredients), 3)
+}
