@@ -155,6 +155,15 @@ func (m *model) hasIngredients(d dish.Dish) bool {
 	return have == total
 }
 
+func (m *model) hasDrafted(ing ingredient.Ingredient) bool {
+	for _, drafted := range m.ingredients {
+		if drafted == ing {
+			return true
+		}
+	}
+	return false
+}
+
 func eventString(e game.Event) string {
 	switch e := e.(type) {
 	case game.PhaseEvent:
@@ -219,7 +228,7 @@ func (d *draftMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 				d.cursor++
 			}
 		case "enter", " ":
-			if len(d.draft) > 0 {
+			if len(d.draft) > 0 && !m.hasDrafted(d.draft[d.cursor]) {
 				m.actions <- game.DraftSelectionAction{Index: d.cursor}
 			}
 		}
@@ -236,7 +245,9 @@ func (d *draftMode) View(m *model) string {
 			cursor = ">"
 		}
 		line := fmt.Sprintf("%s %s (%s)", cursor, ing.Name, ing.Role)
-		if d.cursor == i {
+		if m.hasDrafted(ing) {
+			line = disabledStyle.Render(line)
+		} else if d.cursor == i {
 			line = selectedStyle.Render(line)
 		}
 		b.WriteString(line + "\n")
@@ -480,6 +491,7 @@ var (
 	titleStyle    = lipgloss.NewStyle().Bold(true)
 	paneStyle     = lipgloss.NewStyle().Padding(0, 1)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
+	disabledStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
 	missingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
 	servedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00"))
 	statusStyle   = lipgloss.NewStyle().Padding(0, 1)
