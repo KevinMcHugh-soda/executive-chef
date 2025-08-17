@@ -50,6 +50,32 @@ func TestDraftPhaseAllowsFivePicksAfterFirstTurn(t *testing.T) {
 	assert.Len(t, p.Drafted, 5)
 }
 
+func TestDesignPhaseRejectsDishesWithMoreThanThreeIngredients(t *testing.T) {
+	p := player.New()
+	p.Drafted = []ingredient.Ingredient{
+		{Name: "Ing1", Role: ingredient.Protein},
+		{Name: "Ing2", Role: ingredient.Protein},
+		{Name: "Ing3", Role: ingredient.Protein},
+		{Name: "Ing4", Role: ingredient.Protein},
+	}
+	events := make(chan Event, 10)
+	actions := make(chan Action, 10)
+	g := New(nil, nil, p, events, actions)
+	turn := Turn{Number: 1, Game: g}
+
+	done := make(chan struct{})
+	go func() {
+		turn.DesignPhase()
+		close(done)
+	}()
+
+	actions <- CreateDishAction{Name: "TooMany", Indices: []int{0, 1, 2, 3}}
+	actions <- FinishDesignAction{}
+	<-done
+
+	assert.Empty(t, p.Dishes)
+}
+
 func TestServicePhaseRejectsNonMatchingDish(t *testing.T) {
 	p := player.New()
 	chicken := ingredient.Ingredient{Name: "Chicken", Role: ingredient.Protein}
