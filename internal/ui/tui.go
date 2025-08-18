@@ -299,7 +299,10 @@ func (d *designMode) Init(m *model) tea.Cmd {
 	d.name = textinput.New()
 	d.name.Placeholder = "Dish name"
 	d.name.Blur()
-	d.dishes = []createdDish{}
+	d.dishes = make([]createdDish, len(m.dishes))
+	for i, dish := range m.dishes {
+		d.dishes[i] = createdDish{name: dish.Name, index: i}
+	}
 	d.focus = focusIngredients
 	d.confirm = false
 	d.deleteConfirm = false
@@ -334,6 +337,11 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 					d.dishCursor--
 				}
 				break
+			}
+		}
+		for i := range d.dishes {
+			if d.dishes[i].index > msg.Index {
+				d.dishes[i].index--
 			}
 		}
 		d.confirm = false
