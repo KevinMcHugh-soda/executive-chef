@@ -41,7 +41,7 @@ type model struct {
 
 func initialModel(actions chan<- game.Action) *model {
 	m := &model{actions: actions}
-	m.mode = &draftMode{}
+	m.mode = &draftMode{remaining: -1}
 	m.vp = viewport.New(logWidth-2, 7)
 	return m
 }
@@ -261,6 +261,9 @@ func (d *draftMode) View(m *model) string {
 }
 
 func (d *draftMode) Status(m *model) string {
+	if d.remaining < 0 {
+		return "Revealing ingredients..."
+	}
 	return fmt.Sprintf(
 		"Pick %d more ingredients • up/down: move • enter/space: draft • q: quit",
 		d.remaining,
@@ -518,7 +521,7 @@ func (s *serviceMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 	case game.ServiceEndEvent:
 		s.finished = true
 	case game.DraftOptionsEvent:
-		return &draftMode{draft: msg.Reveal}, nil
+		return &draftMode{draft: msg.Reveal, remaining: msg.Picks}, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
