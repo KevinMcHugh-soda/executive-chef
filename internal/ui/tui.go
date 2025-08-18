@@ -486,13 +486,21 @@ func (d *designMode) Status(m *model) string {
 
 func defaultDishName(selected map[int]bool, drafted []ingredient.Ingredient) string {
 	var names []string
+	allVegetables := true
+	count := 0
 	for i := range drafted {
 		if selected[i] {
-			names = append(names, drafted[i].Name)
-			if len(names) == 2 {
-				break
+			if drafted[i].Role != ingredient.Vegetable {
+				allVegetables = false
+			}
+			count++
+			if len(names) < 2 {
+				names = append(names, drafted[i].Name)
 			}
 		}
+	}
+	if count > 1 && allVegetables {
+		return names[0] + " Salad"
 	}
 	switch len(names) {
 	case 2:
