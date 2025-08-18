@@ -545,11 +545,39 @@ func (s *serviceMode) View(m *model) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Service") + "\n")
 	if s.current != nil {
-		var craving []string
-		if len(s.current.Customer.Cravings) > 0 {
-			for _, ing := range s.current.Customer.Cravings[0].Ingredients {
+		var constraint string
+		if s.current.Customer.Constraint != nil {
+			constraint = fmt.Sprintf(" (no %s)", s.current.Customer.Constraint.Name)
+		}
+
+		// Determine which craving was fulfilled by the served dish.
+		fulfilled := 0
+		bestScore := 0
+		if s.current.Dish != nil {
+			fulfilled = -1
+			for i, cr := range s.current.Customer.Cravings {
+				score := 0
+				for _, ing := range cr.Ingredients {
+					for _, ding := range s.current.Dish.Ingredients {
+						if ding == ing {
+							score++
+							break
+						}
+					}
+				}
+				if score > bestScore {
+					bestScore = score
+					fulfilled = i
+				}
+			}
+		}
+
+		b.WriteString(fmt.Sprintf("%s%s\n", s.current.Customer.Name, constraint))
+		for i, cr := range s.current.Customer.Cravings {
+			var craving []string
+			for _, ing := range cr.Ingredients {
 				name := ing.Name
-				if s.current.Dish != nil {
+				if i == fulfilled && s.current.Dish != nil {
 					for _, ding := range s.current.Dish.Ingredients {
 						if ding == ing {
 							name = servedStyle.Render(name)
@@ -559,21 +587,19 @@ func (s *serviceMode) View(m *model) string {
 				}
 				craving = append(craving, name)
 			}
+			b.WriteString(strings.Join(craving, ", "))
+			if i == fulfilled {
+				if s.current.Dish != nil {
+					b.WriteString(" -> " + servedStyle.Render(s.current.Dish.Name))
+				} else {
+					b.WriteString(" -> " + missingStyle.Render("no dish"))
+				}
+				if s.current.Payment > 0 {
+					b.WriteString(fmt.Sprintf(" ($%d)", s.current.Payment))
+				}
+			}
+			b.WriteString("\n")
 		}
-		var constraint string
-		if s.current.Customer.Constraint != nil {
-			constraint = fmt.Sprintf(" (no %s)", s.current.Customer.Constraint.Name)
-		}
-		b.WriteString(fmt.Sprintf("%s: %s%s -> ", s.current.Customer.Name, strings.Join(craving, ", "), constraint))
-		if s.current.Dish != nil {
-			b.WriteString(servedStyle.Render(s.current.Dish.Name))
-		} else {
-			b.WriteString(missingStyle.Render("no dish"))
-		}
-		if s.current.Payment > 0 {
-			b.WriteString(fmt.Sprintf(" ($%d)", s.current.Payment))
-		}
-		b.WriteString("\n")
 	}
 	return paneStyle.Render(b.String())
 }
