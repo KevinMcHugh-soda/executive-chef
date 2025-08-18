@@ -27,9 +27,12 @@ This project implements a small drafting game.
 
 ## Checks
 
-Run the following to verify changes compile:
+Always write or update tests for any code changes and run them.
+
+Run the following to verify changes compile and tests pass:
 
 ```bash
 go mod tidy
 go build ./...
+go test ./...
 ```
