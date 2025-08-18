@@ -436,7 +436,7 @@ func (d *designMode) Update(m *model, msg tea.Msg) (uiMode, tea.Cmd) {
 				d.name.Blur()
 			}
 		case "f", "F":
-			if d.focus == focusIngredients {
+			if d.focus == focusIngredients || d.focus == focusDishes {
 				m.message = ""
 				m.actions <- game.FinishDesignAction{}
 				return nil, nil
